@@ -8,22 +8,46 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.ObjectStreamException;
 import java.sql.Timestamp;
-import java.util.Arrays;
 import java.util.HashMap; 
 import org.apache.commons.codec.binary.*;
-import java.net.InetAddress;
 //import java.
 public class KeyValueStore implements Serializable {
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 2711225303420025142L;
+	/**
+	 * idToClockMap- vector clock structure. Uses IP address to fetch corresponding clock value
+	 */
 	private HashMap<String,Integer> idToClockMap;
+	/**
+	 * key- key that is associated with the value. Key identifies the object being stored.
+	 */
 	private byte[] key;
+	/**
+	 * value- value of the object being stored with the key. Just a large string (can handle json)
+	 */
 	private String value;
+	/**
+	 * timeStamp-timeStamp of when data created.
+	 */
 	private Timestamp timeStamp;
+
+	/**
+	 * hasher- structure to do hashing of keys if needed
+	 */
 	private transient MessageDigest hasher;
+	/**
+	 * resource path- directory where to store the serialized data
+	 */
 	private final String resourcePath="src/main/resources/";
 	
-	
+	/**
+	 * Constructor- constructs Key Value Store Class from hash and a value
+	 * @param key- hash (SHA-256) of the object being used
+	 * @param value- String representation of the value of the object
+	 */
 	public KeyValueStore(byte[] key,String value){
 		idToClockMap= new HashMap<String,Integer>();
 		this.value=value;
@@ -36,7 +60,11 @@ public class KeyValueStore implements Serializable {
 			e.printStackTrace();
 		}
 	}
-	
+	/**
+	 * Constructor- constructs Key Value Store Class from hash and a value
+	 * @param keyName- String name of key that will be hashed
+	 * @param value- String representation of the value of the object
+	 */
 	public KeyValueStore(String keyName,String value){
 		try{
 			hasher= MessageDigest.getInstance("SHA-256");
@@ -48,59 +76,76 @@ public class KeyValueStore implements Serializable {
 		this.value=value;
 		timeStamp= new Timestamp(System.currentTimeMillis());
 		idToClockMap= new HashMap<String,Integer>();
-	}
+	}	
 	
+	/**
+	 * isEqual- compares two KeyValueStore instances
+	 * @param e- KeyValueStore to compare to
+	 * @return true if classes have same data
+	 */
 	public boolean isEqual(KeyValueStore e){
 		if(!e.idToClockMap.equals(idToClockMap)){
-			System.out.print("MAPS DONT MATCH");
+			System.out.println("MAPS DONT MATCH");
 			return false;
 		}
 		if(!MessageDigest.isEqual(key, e.key)){
-			System.out.print("KEYS DONT MATCH");
-			System.out.println();
-			System.out.print(e.key.toString()+" "+key.toString());
+			System.out.println("KEYS DONT MATCH");
+			System.out.println(e.key.toString()+" "+key.toString());
 			return false;
 		}
 		if(!value.equals(e.value)){
-			System.out.print("Values DONT MATCH");
-			System.out.println();
-			System.out.print(e.value.toString()+" "+value.toString());
+			System.out.println("Values DONT MATCH");
+			System.out.println(e.value.toString()+" "+value.toString());
 			return false;
 		}
 		if(!timeStamp.equals(e.timeStamp)){
-			System.out.print("Timestamps DONT MATCH");
+			System.out.println("Timestamps DONT MATCH");
 			return false;
 		}
-		System.out.print(hasher.getAlgorithm());
+		if(!hasher.getAlgorithm().equals(e.hasher.getAlgorithm())){
+			System.out.println("ALGORITHMS dont match");
+			return false;
+		}
 		return true;
 	}
 	
+	/**
+	 * setHashMap- TESTING FUNCTION WILL NOT BE NEEDED IN ACTUAL IMPLEMENTATION.
+	 * 		       Allows setting of different vector clocks to test possibilities of 
+	 * 			   vector clock combinations from inputs.
+	 * @param a-vector clock one wants to set
+	 */
 	public void setHashMap(HashMap<String,Integer> a){
 		idToClockMap= a;
+		//timeStamp=new Timestamp((long)5);
 	}
 	
+	/**
+	 * updateVectorClock- updates proper vector clock entry on serialization
+	 * @param addr- IP address of the host doing serialization
+	 */
 	private void updateVectorClock(String addr){
-		//assert(vectorClockPosition<vectorClock.length);
-		System.out.println(addr);
 		if(idToClockMap.containsKey(addr)){
-			System.out.println(addr);
 			idToClockMap.put(addr, Integer.valueOf(idToClockMap.get(addr).intValue()+1));
 		}
 		else{
-			System.out.println(addr);
 			idToClockMap.put(addr,1);
 		}
 		timeStamp= new Timestamp(System.currentTimeMillis());
 	}
 	
-	private void consolidateKeys(KeyValueStore cmp){
+	/**
+	 * consolidateKeys- updates this instance with the most up to date data between
+	 * 					the new store and the serialized data
+	 * @param cmp- instance of class that was deserialized from persistent storage.
+	 * @return true if it needs to be serialized bc new data false otherwise
+	 */
+	private boolean consolidateKeys(KeyValueStore cmp,String addr){
 		int numGreaterPositions=0;
 		int numEqualPositions=0;
 		for( String key : idToClockMap.keySet()){
 			if(cmp.idToClockMap.containsKey(key)){
 				//then compare
-				System.out.println("MINE: "+idToClockMap.get(key).toString());
-				System.out.println("PERSISTANT: "+cmp.idToClockMap.get(key).toString());
 				if(idToClockMap.get(key).intValue()>cmp.idToClockMap.get(key).intValue()){
 					numGreaterPositions++;
 				}
@@ -110,7 +155,7 @@ public class KeyValueStore implements Serializable {
 				
 			}
 			else{
-				//know it has the greater value since it is not initialized
+				//know this instance has the greater value since it is not initialized
 				numGreaterPositions++;
 			}
 		}
@@ -119,14 +164,15 @@ public class KeyValueStore implements Serializable {
 			maxSize=idToClockMap.size();
 		else
 			maxSize=cmp.idToClockMap.size();
-		System.out.println(maxSize);
+		//if not every clock greater than or equal to cmp, but at least one is greater than cmp
 		if(numGreaterPositions>0 && (numGreaterPositions+numEqualPositions!=maxSize)){
 			//conflict, need to merge keys on timestamp
-			System.out.println("MERGING");
-			if(cmp.timeStamp.after(timeStamp)){
-				//idToClockMap=cmp.idToClockMap;
-				value=cmp.value;
-			}
+			//ON CONFLICT CAN DO LAST WRITE WINS, NO NEED FOR TIMESTAMP
+			//THEN READER CAN DECIDE ON HOW TO HANDLE CONFLICTING VALUES
+			//if(cmp.timeStamp.after(timeStamp)){
+				//value=cmp.value;
+			//}
+			//otherwise, last write (new data on network wins)
 			//get max of every value
 			for( String key : cmp.idToClockMap.keySet()){
 				if(idToClockMap.containsKey(key)){
@@ -141,40 +187,47 @@ public class KeyValueStore implements Serializable {
 			}	
 		}
 		else if(numGreaterPositions==0){
-			//take all of compares values, bc its greater
-			System.out.println("TAKING CMPS STUFF");
-			idToClockMap=cmp.idToClockMap;
-			value=cmp.value;
+			if(numEqualPositions!=maxSize){
+				//serialized data has newest entries AND no need to serialize again
+				idToClockMap=cmp.idToClockMap;
+				value=cmp.value;
+				return false;
+			}
+			else; //had all equal vector clock values, so need to serialize data
+			//this solves case of (R=1)
 		}
-		else; //already have up to date values so don't need to adjust anything
+		else;//this instance had all greater or equal vector clocks so needs to serialze
+		return true;
 	}
 	
+	/**
+	 * updatePersistantStorage- compares instance in persistance storage and serializes the most
+	 * 							up to date values.
+	 * @param addr- IP address of host doing serialization
+	 */
 	public void updatePersistantStore(String addr){
-		//UPDATE VECTOR CLOCK ON NODE AND STORE
-		//write object
-		//assert(MessageDigest.isEqual(cmp.key, key));
 		try {
-			System.out.println();
-			System.out.print(resourcePath+Hex.encodeHexString(key).toString()+".ser");
-			System.out.println();
+			//System.out.println(resourcePath+Hex.encodeHexString(key).toString()+".ser");
 			FileInputStream fileIn = new FileInputStream(resourcePath+Hex.encodeHexString(key).toString()+".ser");
 			ObjectInputStream in = new ObjectInputStream(fileIn);
 			KeyValueStore cmp= (KeyValueStore) in.readObject();
-			consolidateKeys(cmp);
 			fileIn.close();
 			in.close();
+			boolean needToSerialize=consolidateKeys(cmp,addr);
+			//if serialized value up to date no need to serialize it
+			if(!needToSerialize)
+				return;
 		} catch (FileNotFoundException noFile) {
-			//theres no existing persistant storage
+			//theres no existing persistant storage, we can serialize the new entry
 			System.out.print("FIRST WRITE");
 		}
 		catch(Exception e){
+			//otherwise we have a bad exception and need to fail
 			e.printStackTrace();
 		}
 		//update vector clock before writing
 		updateVectorClock(addr);
 		try{
-			System.out.println();
-			System.out.println();
 			FileOutputStream outFile=new FileOutputStream(resourcePath+Hex.encodeHexString(key).toString()+".ser");
 			ObjectOutputStream out = new ObjectOutputStream(outFile);
 			out.writeObject(this);
@@ -194,6 +247,12 @@ public class KeyValueStore implements Serializable {
 		return returnString;
 	}
 	
+	/**
+	 * readObject- instantiates transient data before the object is returned to the user
+	 * @param in- input stream object being serialized to
+	 * @throws IOException
+	 * @throws ClassNotFoundException
+	 */
 	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         in.defaultReadObject();
         try {
