@@ -11,8 +11,8 @@ port = 12365                # Reserve a port for your service.
 
 data = {}
 data['KEY'] = 'dummy_key'
-data['METHOD'] = 'GET'
-data['VALUE'] = 'hello'
+data['METHOD'] = 'POST'
+data['VALUE'] = 'hello_upd12'
 
 j_dump=json.dumps(data)
 s.connect((host, port))

@@ -9,7 +9,7 @@ from threading import Thread, Lock
 mutex = Lock()
 
 HOST = '24.72.242.230'
-PORT = 12358               # Reserve a port for your service.
+PORT = 12357               # Reserve a port for your service.
 
 data={}
 
@@ -50,14 +50,14 @@ def clientthread(conn):
         mutex.acquire()
         testdata['VALUE']=data['VALUE']
         print testdata
-        conn.send('OK')    
-        mutex.release()
+        conn.send('OK') 
+        mutex.release()   
+
 
 while 1:
     #wait to accept a connection - blocking call
     conn, addr = s.accept()
     print 'Connected with ' + addr[0] + ':' + str(addr[1])
     start_new_thread(clientthread ,(conn,))
-
  
 s.close()                  # Close the socket when done

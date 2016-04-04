@@ -8,8 +8,12 @@ import hashlib
 import urllib
 import urllib2
 import time
+import select
 from collections import Counter 
 from itertools import chain
+from threading import Thread, Lock
+
+mutex = Lock()
 
 value=["yaksh's key","yaksh's value_new","yaksh's key","yaksh's value_old"]
 timestmp=["yaksh's key","Feb 12 08:02:32 2013","yaksh's key","Jan 27 11:52:02 2011"]
@@ -19,8 +23,8 @@ rcount = 2
 wcount = 2
 replicas = 3
 
-HOST = ''   # Symbolic name meaning all available interfaces
-PORT = 12345 # Arbitrary non-privileged port
+HOST = ''    # Symbolic name meaning all available interfaces
+PORT = 12365 # Arbitrary non-privileged port
 
 class KeyValueInfo:
     def __init__(self, key, value, time_stamp):
@@ -42,25 +46,17 @@ def clientthread(conn):
             rep="key not found"
             data = json.loads(conn.recv(1024))
             # j_load= json.loads(data)
-            mydict.update(data)
-            rep=ask_dbnodes(data)
+            # mydict.update(data)
+            if(data['METHOD']== 'GET'): 
+                rep=get_from_dbnodes(data)
+            elif(data['METHOD']=='POST'):
+                rep=post_to_dbnodes(data)
+            else:
+                rep='Error: Invalid Method Parameter'
             # print data[data.keys()[0]][0]
             # print mydict
         except ValueError:
             print "Nothing Received \n"
-
-        # count=0
-        # rep="key not found"
-        # time="Jan 1 00:00:00 1999"
-        # time=datetime.strptime(time, "%b %d %H:%M:%S %Y")
-        # for i in value:
-        #   count=count+1
-        #   if(i==data):
-        #         if(max((time,datetime.strptime(timestmp[count], "%b %d %H:%M:%S %Y")))==datetime.strptime(timestmp[count], "%b %d %H:%M:%S %Y")):
-        #           time=datetime.strptime(timestmp[count], "%b %d %H:%M:%S %Y")
-        #           print time
-        #           rep=value[count]
-        #         print rep
                 
         try:
             conn.send(json.dumps(rep))
@@ -72,30 +68,129 @@ def clientthread(conn):
         if not data: 
             break
      
-        # conn.sendall(reply)
      
     #came out of loop
     conn.close()
- 
 
-# def ip_lookup(hash_key):
-def ask_dbnodes(data):
+def post_to_dbnode3(data):
+    s3 = socket.socket()         # Create a socket object
+
+    host1 = '24.72.242.230'      # Get local machine name
+    port1 = 12357                # Reserve a port for your service.
+    s3.connect((host1, port1))
+
+    j_dump=json.dumps(data)
+    s3.send(j_dump)
+
+    #set timeout on receive to avoid deadlock
+    #if reply='404' then key not found, otherwise reply='OK'
+    print 'blocking node 3'
+    s3.settimeout(2)
+
+    try:
+        # print 'here\n'
+        reply3=s3.recv(1024)
+        print reply3
+    except socket.error as err:
+        reply3='404'
+        print (err)    
+
+    s3.close()
+    return reply3
+ 
+def post_to_dbnodes(data):
+    # acquire mutex incase of multiple connections to same
+    # db servers. Otherwise,If one connection completes, the port will 
+    # be closed and will result in unpredictable behavior for the other connection.
+    # Also, the sends from the dbnodes will be coming to the same port and IP and
+    # two multiple connections won't be able to differentiate between the two.
+    mutex.acquire()
+
     s1 = socket.socket()         # Create a socket object
     s2 = socket.socket()         # Create a socket object
-#    host1 = '24.72.242.230' # Get local machine name
-    host1 = '192.168.56.1' # Get local machine name
-    port1 = 12348             # Reserve a port for your service.
+
+    host1 = '24.72.242.230'      # Get local machine name
+    port1 = 12358                # Reserve a port for your service.
     s1.connect((host1, port1))
-    host2 = '192.168.56.1' # Get local machine name
-    port2 = 12349             # Reserve a port for your service.
+
+    host2 = '24.72.242.230'      # Get local machine name
+    port2 = 12359                # Reserve a port for your service.
     s2.connect((host2, port2))
+
     j_dump=json.dumps(data)
     s1.send(j_dump)
     s2.send(j_dump)
-    time.sleep(1)
 
-    # reply1=s1.recv(1024)
-    # reply2=s2.recv(1024)
+    print 'blocking on node 1 and 2'
+
+    #set timeout on receive to avoid deadlock
+    #if reply='404' then key not found, otherwise reply='OK'
+    s1.settimeout(2)
+    s2.settimeout(2)
+
+    try:
+        reply2=s2.recv(1024)
+        print 'this ' + reply2
+    except socket.error as err:
+        reply2='404'
+        print (err)  
+
+    try:
+        reply1=s1.recv(1024)
+        print 'this ' + reply1
+    except socket.error as err:
+        print (err)
+        reply1='404'
+      
+
+    if(reply1=='OK' and reply2=='OK'):
+        s1.close()
+        s2.close()
+        mutex.release()
+        return 'POST SUCCESS'
+
+    elif((reply1=='404' and reply2=='OK') or (reply1=='OK' and reply2=='404') ):
+        # Since one of the two primary servers failed 
+        # to respond try the third server.
+        n3_rep=post_to_dbnode3(data)
+        if (n3_rep=='OK'):
+            s1.close()
+            s2.close()
+            mutex.release()
+            return 'POST SUCESS'
+        s1.close()
+        s2.close()
+        mutex.release()
+        return 'Error: 2 of 3 Servers Down, Please try again in a few seconds'
+
+    else:
+        mutex.release()
+        return 'Error: 2 of 3 Servers Down, Please try again in a few seconds (Server 1 and Server 2)'
+
+
+# def ip_lookup(hash_key):
+def get_from_dbnodes(data):
+    # acquire mutex incase of multiple connections to same
+    # db servers. Otherwise,If one connection completes, the port will 
+    # be closed and will result in unpredictable behavior for the other connection.
+    # Also, the sends from the dbnodes will be coming to the same port and IP and
+    # two multiple connections won't be able to differentiate between the two.    
+    mutex.acquire()
+
+    s1 = socket.socket()         # Create a socket object
+    s2 = socket.socket()         # Create a socket object
+
+    host1 = '24.72.242.230'      # Get local machine name
+    port1 = 12358                # Reserve a port for your service.
+    s1.connect((host1, port1))
+
+    host2 = '24.72.242.230'      # Get local machine name
+    port2 = 12359                # Reserve a port for your service.
+    s2.connect((host2, port2))
+
+    j_dump=json.dumps(data)
+    s1.send(j_dump)
+    s2.send(j_dump)
 
     reply1=json.loads(s1.recv(1024))
     reply2=json.loads(s2.recv(1024))
@@ -115,6 +210,7 @@ def ask_dbnodes(data):
     else:
         #Merge the vector clocks
         vector_clock = dict(sorted(chain(reply1['VECTOR_CLOCK'][1].items(), reply2['VECTOR_CLOCK'][1].items()), key=lambda t: t[1]))
+        print vector_clock
         if conflict == 1:
             reply1['VECTOR_CLOCK'][1] = vector_clock
             recent_reply = reply1
@@ -123,6 +219,12 @@ def ask_dbnodes(data):
             recent_reply = reply2
         
     s1.close()
+    s2.close()
+
+    print recent_reply
+
+    mutex.release()
+
     return recent_reply
 
 

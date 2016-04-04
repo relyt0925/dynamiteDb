@@ -6,7 +6,11 @@
 -master sends back this value as a json object to the client.
 
 
-run on three different terminals (or run dbnode1.py and master.py in background):
+run on three different terminals in the given order (or run dbnode1.py,dbnode2.py,dbnode3.py and master.py in background):
+python dbnode1.py
+python dbnode2.py
+python dbnode3.py
 python master.py
 python client.py
-python dbnode1.py
+python client1.py
+
