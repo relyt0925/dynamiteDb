@@ -1,6 +1,7 @@
 package dynamiteDb;
 
 import java.io.BufferedReader;
+
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -18,11 +19,13 @@ import java.util.logging.Logger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.sql.Timestamp;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 import org.apache.commons.codec.binary.Hex;
 import org.json.JSONException;
 import org.json.JSONObject;
-
 /**
  * This class extends the java.lang.Thread class and handles all the processing
  * related to client request
@@ -32,10 +35,10 @@ import org.json.JSONObject;
  */
 public class ClientListener extends Thread {
 	private Socket socket;
-	private String key;
-	private String method;
-	private String value;
-	private HashMap<String,String> vectorMap;
+	//private String key;
+	//private String method;
+	//private String value;
+	//private HashMap<String,Integer> vectorMap;
 	private static HashMap <String,ReadWriteLock> keyLockMap;
 	private static ReadWriteLock keyLockMapLock= new ReentrantReadWriteLock();
 	private final String resPath="src/main/resources/";
@@ -62,7 +65,7 @@ public class ClientListener extends Thread {
 			JSONObject jsonObj = new JSONObject(input);
 			
 			//Based upon the method perform call appropriate handling function
-			method = jsonObj.getString("METHOD");
+			String method = jsonObj.getString("METHOD");
 			
 			//Based upon the method call appropriate handler function
 			if(KeyValueServer.METHOD_GET.equals(method)){
@@ -76,8 +79,8 @@ public class ClientListener extends Thread {
 			}
 			
 			//Debug Purpose only
-			System.out.println("KEY = "+key + "; METHOD = "+method+"; VALUE = "+value);
-			System.out.println(Arrays.asList(vectorMap)); 
+			//System.out.println("KEY = "+key + "; METHOD = "+method+"; VALUE = "+value);
+			//System.out.println(Arrays.asList(vectorMap)); 
 			
 			
 
@@ -107,9 +110,9 @@ public class ClientListener extends Thread {
 	 * @throws JSONException
 	 */
 	private void handleANTI_ENTROPYReq(JSONObject jsonObj) throws JSONException {
-
+		/*
 		JSONObject vectorClockJObj = jsonObj.getJSONObject("VECTOR_CLOCK");
-		vectorMap = new HashMap<String, String>();
+		vectorMap = new HashMap<String, Integer>();
 		Iterator<String> keys = vectorClockJObj.keys();
 		while (keys.hasNext()) {
 			String vectorKey = keys.next();
@@ -118,7 +121,8 @@ public class ClientListener extends Thread {
 			if (val != null) {
 				vectorMap.put(vectorKey, val);
 			}
-		}		
+		}	
+		*/	
 	}
 	
 	
@@ -128,13 +132,44 @@ public class ClientListener extends Thread {
 	 * @param jsonObj
 	 * @throws JSONException
 	 */
+	
+	private HashMap<String,Integer> convertVectorClockFromJSON(JSONObject vectClock) throws JSONException{
+		HashMap<String,Integer> vectorClockMap = new HashMap<String, Integer>();
+		Iterator<String> keys = vectClock.keys();
+		while (keys.hasNext()) {
+			String vectorKey = keys.next();
+			String val = null;
+			val = vectClock.getString(vectorKey);
+			if (val != null) {
+				vectorClockMap.put(vectorKey, Integer.parseInt(val));
+			}
+		}
+		return vectorClockMap;
+	}
 
 	private void handlePUTReq(JSONObject jsonObj) throws JSONException {
-
-		key = jsonObj.getString("KEY");
-		value = jsonObj.getString("VALUE");
-		
-		
+		String key = jsonObj.getString("KEY");
+		String value = jsonObj.getString("VALUE");
+		System.out.println(jsonObj.getString("TIMESTAMP"));
+		Timestamp time= Timestamp.valueOf(jsonObj.getString("TIMESTAMP"));
+		JSONObject vectorClockJSON = jsonObj.getJSONObject("VECTOR_CLOCK");
+		HashMap<String,Integer> vectClock=convertVectorClockFromJSON(vectorClockJSON);
+		KeyValueStore newData= new KeyValueStore(key,value,time,vectClock);
+		keyLockMapLock.writeLock().lock();
+		if(!keyLockMap.containsKey(key)){
+			keyLockMap.put(key,new ReentrantReadWriteLock());
+		}
+		keyLockMapLock.writeLock().unlock();
+		keyLockMap.get(key).writeLock().lock();
+		try {
+            InetAddress ip = InetAddress.getLocalHost();
+            newData.updatePersistantStore(ip.toString(),false);
+            System.out.println(newData.toString());
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
+		keyLockMap.get(key).writeLock().unlock();
+		sendKeyValueStoreObject(newData);	
 	}
 	
 	private void sendKeyValueStoreObject(KeyValueStore a){
@@ -155,7 +190,11 @@ public class ClientListener extends Thread {
 		try{
 			OutputStreamWriter out = new OutputStreamWriter(socket.getOutputStream(),
 					 StandardCharsets.UTF_8);
-			out.write(jsonObj.toString());			                     
+			out.write(jsonObj.toString());
+			out.write("\n");
+			out.flush();
+			socket.close();
+			System.out.println(jsonObj.toString());
 		}
 		catch(Exception e){
 			e.printStackTrace();
@@ -169,10 +208,11 @@ public class ClientListener extends Thread {
 	 * @throws JSONException
 	 */
 	private void handleGETRequest(JSONObject jsonObj) throws JSONException {
-		key = jsonObj.getString("KEY");
+		System.out.println("IN GETTTTT");
+		String key = jsonObj.getString("KEY");
 		//lock read lock
 		keyLockMapLock.readLock().lock();
-		//see if key exsits
+		//if it doesnt contain key
 		if(!keyLockMap.containsKey(key)){
 			//if it doesnt have the key, no value stored
 			keyLockMapLock.readLock().unlock();
@@ -200,6 +240,9 @@ public class ClientListener extends Thread {
 				keyLockMap.get(key).readLock().unlock();
 				//create json object and return it to client
 				sendKeyValueStoreObject(cmp);
+				String value=cmp.getValue();
+				System.out.println(value);
+				System.out.flush();
 			} catch (FileNotFoundException noFile) {
 				//Shouldnt be case if a key is in the hashmap
 				System.out.print("ERROR: WHY IS THERE KEY IN HASHMAP IF FILENOTFOUND");
@@ -209,5 +252,9 @@ public class ClientListener extends Thread {
 				e.printStackTrace();
 			}	
 		}			
+	}
+	
+	public static void setInitKeyLockHashmap(HashMap <String,ReadWriteLock> keyLockMapp){
+		keyLockMap=keyLockMapp;
 	}
 }

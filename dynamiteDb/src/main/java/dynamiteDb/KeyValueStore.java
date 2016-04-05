@@ -1,5 +1,6 @@
 package dynamiteDb;
 import java.security.MessageDigest;
+
 import java.security.NoSuchAlgorithmException;
 import java.io.Serializable;
 import java.io.FileInputStream;
@@ -9,7 +10,9 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.sql.Timestamp;
-import java.util.HashMap; 
+import java.util.HashMap;
+
+import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.*;
 //import java.
 public class KeyValueStore implements Serializable {
@@ -56,6 +59,22 @@ public class KeyValueStore implements Serializable {
 		}	
 	}
 	
+	public KeyValueStore(String hexEncodedKey,String value, Timestamp timeStamp,HashMap<String,Integer> vectClock){
+		idToClockMap=vectClock;
+		this.timeStamp=timeStamp;
+		this.value=value;
+		try {
+			this.key=Hex.decodeHex(hexEncodedKey.toCharArray());
+			hasher= MessageDigest.getInstance("SHA-256");
+		} catch (DecoderException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		catch ( NoSuchAlgorithmException e){
+			e.printStackTrace();
+		}
+	}
+	
 	/**
 	 * Constructor- constructs Key Value Store Class from hash and a value
 	 * @param key- hash (SHA-256) of the object being used
@@ -64,7 +83,7 @@ public class KeyValueStore implements Serializable {
 	public KeyValueStore(byte[] key,String value){
 		idToClockMap= new HashMap<String,Integer>();
 		this.value=value;
-		timeStamp= new Timestamp(System.currentTimeMillis());
+		//timeStamp= new Timestamp(System.currentTimeMillis());
 		this.key=key;
 		try{
 			hasher= MessageDigest.getInstance("SHA-256");
@@ -87,7 +106,7 @@ public class KeyValueStore implements Serializable {
 			System.out.print(e);
 		}
 		this.value=value;
-		timeStamp= new Timestamp(System.currentTimeMillis());
+		//timeStamp= new Timestamp(System.currentTimeMillis());
 		idToClockMap= new HashMap<String,Integer>();
 	}	
 	
@@ -144,7 +163,7 @@ public class KeyValueStore implements Serializable {
 		else{
 			idToClockMap.put(addr,1);
 		}
-		timeStamp= new Timestamp(System.currentTimeMillis());
+		//timeStamp= new Timestamp(System.currentTimeMillis());
 	}
 	
 	/**
@@ -183,6 +202,7 @@ public class KeyValueStore implements Serializable {
 			//ON CONFLICT, LOOK AT TIMESTAMPS FROM MASTER TO WRITE MOST RECENT VALUE
 			if(cmp.timeStamp.after(timeStamp)){
 				value=cmp.value;
+				timeStamp=cmp.timeStamp;
 			}
 			//otherwise, last write (new data on network wins)
 			//get max of every value
@@ -203,6 +223,7 @@ public class KeyValueStore implements Serializable {
 				//serialized data has newest entries AND no need to serialize again
 				idToClockMap=cmp.idToClockMap;
 				value=cmp.value;
+				timeStamp=cmp.timeStamp;
 				return false;
 			}
 			else; //had all equal vector clock values, so need to serialize data
@@ -217,7 +238,7 @@ public class KeyValueStore implements Serializable {
 	 * 							up to date values.
 	 * @param addr- IP address of host doing serialization
 	 */
-	public void updatePersistantStore(String addr){
+	public void updatePersistantStore(String addr,boolean isAntiEntropy){
 		try {
 			//System.out.println(resourcePath+Hex.encodeHexString(key).toString()+".ser");
 			FileInputStream fileIn = new FileInputStream(resourcePath+Hex.encodeHexString(key).toString()+".ser");
@@ -237,8 +258,9 @@ public class KeyValueStore implements Serializable {
 			//otherwise we have a bad exception and need to fail
 			e.printStackTrace();
 		}
-		//update vector clock before writing
-		updateVectorClock(addr);
+		//update vector clock before writing IF NOT ANTI ENTROPY, OTHERWISE JUST CONSOLIDATE
+		if(!isAntiEntropy)
+			updateVectorClock(addr);
 		try{
 			FileOutputStream outFile=new FileOutputStream(resourcePath+Hex.encodeHexString(key).toString()+".ser");
 			ObjectOutputStream out = new ObjectOutputStream(outFile);

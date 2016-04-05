@@ -1,6 +1,11 @@
 package dynamiteDb;
 
+import java.io.File;
 import java.net.ServerSocket;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.HashMap;
 
 /**
  * This class instantiates the Key Value Server. Server initialization is peformed in 
@@ -22,7 +27,10 @@ public class KeyValueServer {
      */
 	public static void main(String[] args) throws Exception{
 		
-		ServerSocket listener = new ServerSocket(9898);
+		HashMap<String,ReadWriteLock> initKeyToLockMap= getListOfKeyFiles();
+		ClientListener.setInitKeyLockHashmap(initKeyToLockMap);
+		
+		ServerSocket listener = new ServerSocket(13000);
 	        try {
 	            while (true) {
 	                new ClientListener(listener.accept()).start();
@@ -30,6 +38,17 @@ public class KeyValueServer {
 	        } finally {
 	            listener.close();
 	        }
-		
+	}
+	
+	private static HashMap<String,ReadWriteLock> getListOfKeyFiles(){
+		File folder = new File("src/main/resources");
+		File[] listOfFiles = folder.listFiles();
+		HashMap<String,ReadWriteLock> initKeyToLockMap = new HashMap<String,ReadWriteLock>();
+		for(File i : listOfFiles){
+			System.out.println(i.getName().substring(0, i.getName().lastIndexOf('.')));
+			String hexKey=i.getName().substring(0, i.getName().lastIndexOf('.'));
+			initKeyToLockMap.put(hexKey, new ReentrantReadWriteLock());
+		}
+		return initKeyToLockMap;
 	}
 }
