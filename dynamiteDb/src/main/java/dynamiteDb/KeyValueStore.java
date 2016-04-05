@@ -43,6 +43,19 @@ public class KeyValueStore implements Serializable {
 	 */
 	private final String resourcePath="src/main/resources/";
 	
+	public KeyValueStore(byte[] key,String value,Timestamp timeStamp){
+		idToClockMap= new HashMap<String,Integer>();
+		this.value=value;
+		this.timeStamp= timeStamp;
+		this.key=key;
+		try{
+			hasher= MessageDigest.getInstance("SHA-256");
+		}
+		catch(Exception e){
+			e.printStackTrace();
+		}	
+	}
+	
 	/**
 	 * Constructor- constructs Key Value Store Class from hash and a value
 	 * @param key- hash (SHA-256) of the object being used
@@ -167,11 +180,10 @@ public class KeyValueStore implements Serializable {
 		//if not every clock greater than or equal to cmp, but at least one is greater than cmp
 		if(numGreaterPositions>0 && (numGreaterPositions+numEqualPositions!=maxSize)){
 			//conflict, need to merge keys on timestamp
-			//ON CONFLICT CAN DO LAST WRITE WINS, NO NEED FOR TIMESTAMP
-			//THEN READER CAN DECIDE ON HOW TO HANDLE CONFLICTING VALUES
-			//if(cmp.timeStamp.after(timeStamp)){
-				//value=cmp.value;
-			//}
+			//ON CONFLICT, LOOK AT TIMESTAMPS FROM MASTER TO WRITE MOST RECENT VALUE
+			if(cmp.timeStamp.after(timeStamp)){
+				value=cmp.value;
+			}
 			//otherwise, last write (new data on network wins)
 			//get max of every value
 			for( String key : cmp.idToClockMap.keySet()){
@@ -262,4 +274,20 @@ public class KeyValueStore implements Serializable {
 			e.printStackTrace();
 		}
     }
+	
+	public String getHexEncodedKey(){
+		return Hex.encodeHexString(key).toString();
+	}
+	
+	public HashMap<String,Integer> getVectorClock(){
+		return idToClockMap;
+	}
+	
+	public String getValue(){
+		return value;
+	}
+	
+	public Timestamp getTimeStamp(){
+		return timeStamp;
+	}
 }

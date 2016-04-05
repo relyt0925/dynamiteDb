@@ -1,16 +1,25 @@
 package dynamiteDb;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.commons.codec.binary.Hex;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -27,6 +36,10 @@ public class ClientListener extends Thread {
 	private String method;
 	private String value;
 	private HashMap<String,String> vectorMap;
+	private static HashMap <String,ReadWriteLock> keyLockMap;
+	private static ReadWriteLock keyLockMapLock= new ReentrantReadWriteLock();
+	private final String resPath="src/main/resources/";
+
 
 	public ClientListener(Socket socket) {
 		this.socket = socket;
@@ -123,6 +136,32 @@ public class ClientListener extends Thread {
 		
 		
 	}
+	
+	private void sendKeyValueStoreObject(KeyValueStore a){
+		JSONObject jsonObj= new JSONObject();
+		try {
+			jsonObj.put("KEY", a.getHexEncodedKey());
+			jsonObj.put("VALUE",a.getValue());
+			jsonObj.put("TIMESTAMP", a.getTimeStamp().toString());
+			jsonObj.put("VECTOR_CLOCK", a.getVectorClock());
+			sendJSON(jsonObj);
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	private void sendJSON(JSONObject jsonObj){
+		try{
+			OutputStreamWriter out = new OutputStreamWriter(socket.getOutputStream(),
+					 StandardCharsets.UTF_8);
+			out.write(jsonObj.toString());			                     
+		}
+		catch(Exception e){
+			e.printStackTrace();
+		} 
+	 }
+	
 
 	/**
 	 * Function to handle get Request
@@ -130,9 +169,45 @@ public class ClientListener extends Thread {
 	 * @throws JSONException
 	 */
 	private void handleGETRequest(JSONObject jsonObj) throws JSONException {
-		
 		key = jsonObj.getString("KEY");
-				
+		//lock read lock
+		keyLockMapLock.readLock().lock();
+		//see if key exsits
+		if(!keyLockMap.containsKey(key)){
+			//if it doesnt have the key, no value stored
+			keyLockMapLock.readLock().unlock();
+			JSONObject returnVals= new JSONObject();
+			returnVals.put("METHOD", "NOVAL");
+			//send NOVAL BACK TO CLIENT AND END CONNECTION
+			sendJSON(returnVals);
+			return;
+		}
+		else{
+			keyLockMapLock.readLock().unlock();
+			//get read lock of specific key
+			//NOTE: IS IT ISSUE IF WRITE OCCURS TO LARGER DATA STRUCTURE????
+			keyLockMap.get(key).readLock().lock();
+			//now can get value
+			//key+=".ser";
+			String fullPath=resPath+key+".ser";
+			try {
+				//System.out.println(fullPath);
+				FileInputStream fileIn = new FileInputStream(fullPath);
+				ObjectInputStream in = new ObjectInputStream(fileIn);
+				KeyValueStore cmp= (KeyValueStore) in.readObject();
+				fileIn.close();
+				in.close();
+				keyLockMap.get(key).readLock().unlock();
+				//create json object and return it to client
+				sendKeyValueStoreObject(cmp);
+			} catch (FileNotFoundException noFile) {
+				//Shouldnt be case if a key is in the hashmap
+				System.out.print("ERROR: WHY IS THERE KEY IN HASHMAP IF FILENOTFOUND");
+			}
+			catch(Exception e){
+				//otherwise we have a bad exception and need to fail
+				e.printStackTrace();
+			}	
+		}			
 	}
-
 }
