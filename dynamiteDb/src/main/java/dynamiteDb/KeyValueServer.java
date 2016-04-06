@@ -6,6 +6,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.HashMap;
+import java.util.Timer;
 
 /**
  * This class instantiates the Key Value Server. Server initialization is peformed in 
@@ -31,6 +32,11 @@ public class KeyValueServer {
 		ClientListener.setInitKeyLockHashmap(initKeyToLockMap);
 		
 		ServerSocket listener = new ServerSocket(13000);
+		Timer timer = new Timer();
+		DaemonServicesHandler daemonHandler = new DaemonServicesHandler();
+		daemonHandler.addDaemonService(new AntiEntopyDeamon(30));
+		timer.scheduleAtFixedRate(new DaemonServicesHandler(), 1000, 1000);
+
 	        try {
 	            while (true) {
 	                new ClientListener(listener.accept()).start();
