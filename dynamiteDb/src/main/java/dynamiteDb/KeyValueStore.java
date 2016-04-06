@@ -44,7 +44,7 @@ public class KeyValueStore implements Serializable {
 	/**
 	 * resource path- directory where to store the serialized data
 	 */
-	private final String resourcePath="src/main/resources/";
+	private final String resourcePath="src/main/resources/keys/";
 	
 	public KeyValueStore(byte[] key,String value,Timestamp timeStamp){
 		idToClockMap= new HashMap<String,Integer>();
@@ -273,6 +273,7 @@ public class KeyValueStore implements Serializable {
 		}
 	}
 	
+	@Override
 	public String toString(){
 		String returnString=idToClockMap.toString()+"\n";
 		returnString+=idToClockMap.toString()+"\n";

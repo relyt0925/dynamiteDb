@@ -33,11 +33,11 @@ def testPut():
     host = 'localhost' # Get local machine name
     port = 13000                # Reserve a port for your service.
     data = {}
-    keyy='IROCK'
+    keyy='IROCKKKKKKKK'
     kevVal=hashlib.sha256(keyy).hexdigest()
     data['KEY'] = kevVal
     data['METHOD'] = 'PUT'
-    data['VALUE'] = 'IIII'
+    data['VALUE'] = 'THISISAWESOME'
     data['TIMESTAMP']=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
     #data['TIMESTAMP']=datetime.date.today().strftime("%Y-%m-%d %H:%M:%S.%f")
     vector_clock = {}
