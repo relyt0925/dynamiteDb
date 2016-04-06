@@ -13,12 +13,9 @@ from collections import Counter
 from itertools import chain
 from threading import Thread, Lock
 
-mutex = Lock()
+#unmutex mutex = Lock()
 
-value=["yaksh's key","yaksh's value_new","yaksh's key","yaksh's value_old"]
-timestmp=["yaksh's key","Feb 12 08:02:32 2013","yaksh's key","Jan 27 11:52:02 2011"]
 dbnodes_ip_hash={}
-mydict={}
 rcount = 2
 wcount = 2
 replicas = 3
@@ -45,8 +42,10 @@ def clientthread(conn):
         try:
             rep="key not found"
             data = json.loads(conn.recv(1024))
-            # j_load= json.loads(data)
-            # mydict.update(data)
+
+            # hashkey = hashlib.sha256(data['KEY']).hexdigest()   #key hashing. uncomment this and the next line.
+            # data['KEY'] = hashkey
+
             if(data['METHOD']== 'GET'): 
                 rep=get_from_dbnodes(data)
             elif(data['METHOD']=='POST'):
@@ -57,6 +56,10 @@ def clientthread(conn):
             # print mydict
         except ValueError:
             print "Nothing Received \n"
+        except IOError, e:
+            if e.errno == errno.EPIPE:
+                print "Client Closed Connection \n"
+                break
                 
         try:
             conn.send(json.dumps(rep))
@@ -72,11 +75,12 @@ def clientthread(conn):
     #came out of loop
     conn.close()
 
+
 def post_to_dbnode3(data):
     s3 = socket.socket()         # Create a socket object
 
-    host1 = '24.72.242.230'      # Get local machine name
-    port1 = 12357                # Reserve a port for your service.
+    host1 = '192.168.56.1'     # Get local machine name
+    port1 = 12357               # Reserve a port for your service.
     s3.connect((host1, port1))
 
     j_dump=json.dumps(data)
@@ -99,21 +103,27 @@ def post_to_dbnode3(data):
     return reply3
  
 def post_to_dbnodes(data):
-    # acquire mutex incase of multiple connections to same
+    # acquire #unmutex mutex incase of multiple connections to same
     # db servers. Otherwise,If one connection completes, the port will 
     # be closed and will result in unpredictable behavior for the other connection.
     # Also, the sends from the dbnodes will be coming to the same port and IP and
     # two multiple connections won't be able to differentiate between the two.
-    mutex.acquire()
-
+    #unmutex mutex.acquire()
+    getdata = data.copy()
+    getdata['METHOD'] = 'GET'
+    getdata = get_from_dbnodes(getdata)
+    print 'I finished get'
+    data['VECTOR_CLOCK'] = getdata['VECTOR_CLOCK']
+    # needs to increase its own vector clock by 1
+   
     s1 = socket.socket()         # Create a socket object
     s2 = socket.socket()         # Create a socket object
 
-    host1 = '24.72.242.230'      # Get local machine name
+    host1 = '192.168.56.1'      # Get local machine name
     port1 = 12358                # Reserve a port for your service.
     s1.connect((host1, port1))
 
-    host2 = '24.72.242.230'      # Get local machine name
+    host2 = '192.168.56.1'      # Get local machine name
     port2 = 12359                # Reserve a port for your service.
     s2.connect((host2, port2))
 
@@ -146,7 +156,7 @@ def post_to_dbnodes(data):
     if(reply1=='OK' and reply2=='OK'):
         s1.close()
         s2.close()
-        mutex.release()
+        #unmutex mutex.release()
         return 'POST SUCCESS'
 
     elif((reply1=='404' and reply2=='OK') or (reply1=='OK' and reply2=='404') ):
@@ -156,74 +166,70 @@ def post_to_dbnodes(data):
         if (n3_rep=='OK'):
             s1.close()
             s2.close()
-            mutex.release()
+            #unmutex mutex.release()
             return 'POST SUCESS'
-        s1.close()
-        s2.close()
-        mutex.release()
-        return 'Error: 2 of 3 Servers Down, Please try again in a few seconds'
-
+        else:
+	        s1.close()
+	        s2.close()
+	        #unmutex mutex.release()
+	        return 'Error: 2 of 3 Servers Down, Please try again in a few seconds'
     else:
-        mutex.release()
+        #unmutex mutex.release()
         return 'Error: 2 of 3 Servers Down, Please try again in a few seconds (Server 1 and Server 2)'
 
 
 # def ip_lookup(hash_key):
 def get_from_dbnodes(data):
-    # acquire mutex incase of multiple connections to same
+    # acquire #unmutex mutex incase of multiple connections to same
     # db servers. Otherwise,If one connection completes, the port will 
     # be closed and will result in unpredictable behavior for the other connection.
     # Also, the sends from the dbnodes will be coming to the same port and IP and
     # two multiple connections won't be able to differentiate between the two.    
-    mutex.acquire()
-
+    #unmutex mutex.acquire()
     s1 = socket.socket()         # Create a socket object
     s2 = socket.socket()         # Create a socket object
 
-    host1 = '24.72.242.230'      # Get local machine name
+    host1 = '192.168.56.1'      # Get local machine name
     port1 = 12358                # Reserve a port for your service.
     s1.connect((host1, port1))
 
-    host2 = '24.72.242.230'      # Get local machine name
+    host2 = '192.168.56.1'      # Get local machine name
     port2 = 12359                # Reserve a port for your service.
     s2.connect((host2, port2))
 
+    print data
     j_dump=json.dumps(data)
     s1.send(j_dump)
     s2.send(j_dump)
-
-    reply1=json.loads(s1.recv(1024))
+    reply1=json.loads(s1.recv(1024))    
     reply2=json.loads(s2.recv(1024))
-
     print reply1
     print reply2
 
-    conflict = conflict_check(reply1['VECTOR_CLOCK'][1], reply2['VECTOR_CLOCK'][1])
-
-    if conflict == 0:
-        #Pick higher timestamp 
+    conflict = conflict_check(reply1['VECTOR_CLOCK'], reply2['VECTOR_CLOCK'])
+    merged_vc = dict(sorted(chain(reply1['VECTOR_CLOCK'].items(), reply2['VECTOR_CLOCK'].items()), key=lambda t: t[1]))
+    if conflict == 0: #Conflict occured
+        #Pick higher timestamp reply and insert merged vector clock 
         print 'conflict occured'
         if reply1['TIMESTAMP'] > reply2['TIMESTAMP'] :
             recent_reply = reply1
         else:
             recent_reply = reply2
-    else:
-        #Merge the vector clocks
-        vector_clock = dict(sorted(chain(reply1['VECTOR_CLOCK'][1].items(), reply2['VECTOR_CLOCK'][1].items()), key=lambda t: t[1]))
-        print vector_clock
+
+    else: #No conflict occured
         if conflict == 1:
-            reply1['VECTOR_CLOCK'][1] = vector_clock
             recent_reply = reply1
         elif conflict == 2:
-            reply2['VECTOR_CLOCK'][1] = vector_clock
             recent_reply = reply2
-        
+    
+    recent_reply['VECTOR_CLOCK'] = merged_vc #insert merged vector clock
+
     s1.close()
     s2.close()
 
     print recent_reply
 
-    mutex.release()
+    #unmutex mutex.release()
 
     return recent_reply
 
@@ -239,11 +245,11 @@ def conflict_check(rep1, rep2):
     rep1.subtract(rep2)
     print rep1
 
-    if (all(rep1[key] >= 0 for key in rep1)):
+    if (all(rep1[key] >= 0 for key in rep1)): #differences all positive -> rep1 is more recent
         conf = 1
-    elif (all(rep1[key] <= 0 for key in rep1)):
+    elif (all(rep1[key] <= 0 for key in rep1)): #differences all negative -> rep2 is more recent
         conf = 2
-    else:
+    else: ##differences are mixed -> conflict in vector clock
         conf = 0
 
     return conf

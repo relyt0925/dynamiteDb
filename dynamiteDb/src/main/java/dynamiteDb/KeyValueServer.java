@@ -18,6 +18,7 @@ import org.apache.commons.codec.binary.Hex;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Timer;
 
 /**
  * This class instantiates the Key Value Server. Server initialization is peformed in 
@@ -59,6 +60,11 @@ public class KeyValueServer {
 		ClientListener.setReplicaTracker(replicaTrack);
 		
 		ServerSocket listener = new ServerSocket(13000);
+		Timer timer = new Timer();
+		DaemonServicesHandler daemonHandler = new DaemonServicesHandler();
+		daemonHandler.addDaemonService(new AntiEntopyDeamon(30));
+		timer.scheduleAtFixedRate(new DaemonServicesHandler(), 1000, 1000);
+
 	        try {
 	            while (true) {
 	                new ClientListener(listener.accept()).start();

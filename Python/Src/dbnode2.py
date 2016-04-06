@@ -8,7 +8,7 @@ from threading import Thread, Lock
 
 mutex = Lock()
 
-HOST = '24.72.242.230'
+HOST = '192.168.56.1'
 PORT = 12359               # Reserve a port for your service.
 
 data={}
@@ -33,8 +33,8 @@ testdata = {}
 testdata['KEY'] = 'dummy_key'
 testdata['METHOD'] = 'GET'
 testdata['VALUE'] = 'dbnode2_val'
-testdata['TIMESTAMP'] = 200
-testdata['VECTOR_CLOCK'] = ['YaksPC/192.168.1.1', { 'A' : 8 , 'B' : 3, 'C' : 8, 'Z' : 20}]
+testdata['TIMESTAMP'] = '2015-04-06 02:18:00.248554'
+testdata['VECTOR_CLOCK'] = {'YaksPC/192.168.1.1': 2, 'A' : 8 , 'B' : 3, 'C' : 8, 'Z' : 23}
 
 def clientthread(conn):
     data1 = json.loads(conn.recv(1024))
@@ -50,7 +50,7 @@ def clientthread(conn):
         mutex.acquire()
         testdata['VALUE']=data['VALUE']
         print testdata
-        conn.send('OK')
+        # conn.send('OK')
         mutex.release()    
 
 
