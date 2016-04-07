@@ -159,8 +159,8 @@ public class ClientListener extends Thread {
             //InetAddress ip = InetAddress.getLocalHost();
 			//update persistant storage and note that it is anti-entropy process
 			//(no incrementing vector clock) also note ip doesnt matter since anti-entropy
-			String ip=getPublicIp();
-            newData.updatePersistantStore(ip,true);
+			//String ip=getPublicIp();
+            newData.updatePersistantStore();
             System.out.println(newData.toString());
         } catch (Exception e) {
             e.printStackTrace();
@@ -216,8 +216,8 @@ public class ClientListener extends Thread {
 		try {
             //InetAddress ip = InetAddress.getLocalHost();
 			//update persistent storage and note that it isn't anti-entropy process
-			String ip=getPublicIp();
-            newData.updatePersistantStore(ip,false);
+			//String ip=getPublicIp();
+            newData.updatePersistantStore();
             System.out.println(newData.toString());
         } catch (Exception e) {
             e.printStackTrace();

@@ -136,8 +136,8 @@ public class AntiEntopyDeamon extends DaemonService {
 					System.out.println("LOCKED WRITE KEY LOCK");
 					releasedWriteLock=false;
 					//ip doesnt matter since it is anti entropy
-					String ip="DOESNTMATTER";
-					newData.updatePersistantStore(ip,true);
+					//String ip="DOESNTMATTER";
+					newData.updatePersistantStore();
 					ClientListener.keyLockMap.get(i).writeLock().unlock();
 					System.out.println("UNLOCKED WRITE KEY LOCK");
 					releasedWriteLock=true;

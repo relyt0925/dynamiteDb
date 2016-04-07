@@ -49,6 +49,7 @@ public class KeyValueServer {
      */
 	public static void main(String[] args) throws Exception{
 		//initialize KeyLockHashmap
+		generateConfigFile();
 		HashMap<String,ReadWriteLock> initKeyToLockMap= getListOfKeyFiles();
 		ClientListener.setInitKeyLockHashmap(initKeyToLockMap);
 		/*

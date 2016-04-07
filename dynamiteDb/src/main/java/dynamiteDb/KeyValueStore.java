@@ -172,7 +172,7 @@ public class KeyValueStore implements Serializable {
 	 * @param cmp- instance of class that was deserialized from persistent storage.
 	 * @return true if it needs to be serialized bc new data false otherwise
 	 */
-	private boolean consolidateKeys(KeyValueStore cmp,String addr){
+	private boolean consolidateKeys(KeyValueStore cmp){
 		int numGreaterPositions=0;
 		int numEqualPositions=0;
 		for( String key : idToClockMap.keySet()){
@@ -226,8 +226,16 @@ public class KeyValueStore implements Serializable {
 				timeStamp=cmp.timeStamp;
 				return false;
 			}
-			else; //had all equal vector clock values, so need to serialize data
-			//this solves case of (R=1)
+			else{
+				//had all equal vector clock values (same client doing concurrent writes), take one
+				//with highest timestamp
+				if(cmp.timeStamp.after(timeStamp)){
+					value=cmp.value;
+					timeStamp=cmp.timeStamp;
+					//persistant has all up to date data
+					return false;
+				}
+			}
 		}
 		else;//this instance had all greater or equal vector clocks so needs to serialze
 		return true;
@@ -236,9 +244,8 @@ public class KeyValueStore implements Serializable {
 	/**
 	 * updatePersistantStorage- compares instance in persistance storage and serializes the most
 	 * 							up to date values.
-	 * @param addr- IP address of host doing serialization
 	 */
-	public void updatePersistantStore(String addr,boolean isAntiEntropy){
+	public void updatePersistantStore(){
 		try {
 			//System.out.println(resourcePath+Hex.encodeHexString(key).toString()+".ser");
 			FileInputStream fileIn = new FileInputStream(resourcePath+Hex.encodeHexString(key).toString()+".ser");
@@ -246,7 +253,7 @@ public class KeyValueStore implements Serializable {
 			KeyValueStore cmp= (KeyValueStore) in.readObject();
 			fileIn.close();
 			in.close();
-			boolean needToSerialize=consolidateKeys(cmp,addr);
+			boolean needToSerialize=consolidateKeys(cmp);
 			//if serialized value up to date no need to serialize it
 			if(!needToSerialize)
 				return;
@@ -259,8 +266,9 @@ public class KeyValueStore implements Serializable {
 			e.printStackTrace();
 		}
 		//update vector clock before writing IF NOT ANTI ENTROPY, OTHERWISE JUST CONSOLIDATE
-		if(!isAntiEntropy)
-			updateVectorClock(addr);
+		//NOTE NEVER UPDATE THE VECTOR CLOCK JUST CONSOLIDATE IT
+		//if(!isAntiEntropy)
+			//updateVectorClock(addr);
 		try{
 			FileOutputStream outFile=new FileOutputStream(resourcePath+Hex.encodeHexString(key).toString()+".ser");
 			ObjectOutputStream out = new ObjectOutputStream(outFile);

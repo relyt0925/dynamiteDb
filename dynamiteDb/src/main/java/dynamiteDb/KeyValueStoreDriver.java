@@ -43,7 +43,7 @@ public class KeyValueStoreDriver {
         InetAddress ip;
         try {
             ip = InetAddress.getLocalHost();
-            cmp.updatePersistantStore(ip.toString(),false);
+            cmp.updatePersistantStore();
             System.out.println(cmp.toString());
             //hostname = ip.getHostName();
             //System.out.println("Your current IP address : " + ip);
