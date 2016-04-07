@@ -1,7 +1,6 @@
 package dynamiteDb;
 
 import java.io.BufferedReader;
-
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -19,9 +18,6 @@ import java.util.logging.Logger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.sql.Timestamp;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 /**
@@ -33,14 +29,14 @@ import org.json.JSONObject;
  */
 public class ClientListener extends Thread {
 	private Socket socket;
-	boolean isAntiEntropyInitiator;
-	int choosenReplica;
-	private static HashMap <String,ReadWriteLock> keyLockMap;
-	private static ConfigFileEntry[] replicaTracker;
-	private static ReadWriteLock keyLockMapLock= new ReentrantReadWriteLock();
+	//boolean isAntiEntropyInitiator;
+	public static HashMap <String,ReadWriteLock> keyLockMap;
+	public static ConfigFileEntry[] replicaTracker;
+	public static final ReadWriteLock keyLockMapLock= new ReentrantReadWriteLock();
 	private final String resPath="src/main/resources/keys/";
 	private final String publicIpFilePath="src/main/resources/ip/hostIp.conf";
 
+	/*
 	public ClientListener(boolean isAntiEntropyInitiator,int choosenReplica){
 		//set socket first
 		this.isAntiEntropyInitiator=isAntiEntropyInitiator;
@@ -51,11 +47,10 @@ public class ClientListener extends Thread {
 		this.choosenReplica=choosenReplica;
 		socket=null;
 	}
+	*/
 
 	public ClientListener(Socket socket) {
 		this.socket = socket;
-		choosenReplica=0;
-		isAntiEntropyInitiator=false;
 	}
 	
 	private String getPublicIp() throws IOException {
@@ -70,13 +65,6 @@ public class ClientListener extends Thread {
 	@Override
 	public void run() {
 		try {
-			
-			if(isAntiEntropyInitiator){
-				//set socket
-				//call handler function to exchange keys
-				return;
-			}
-
 			// Read the byte array from the socket
 			BufferedReader in = new BufferedReader(new InputStreamReader(
 					socket.getInputStream()));
