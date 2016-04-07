@@ -1,7 +1,7 @@
 import socket
 import sys
 from thread import *
-from datetime import datetime
+import datetime
 import json
 import errno
 import hashlib
@@ -13,7 +13,7 @@ from collections import Counter
 from itertools import chain
 from threading import Thread, Lock
 
-#unmutex mutex = Lock()
+mutex = Lock()
 
 dbnodes_ip_hash={}
 rcount = 2
@@ -21,7 +21,7 @@ wcount = 2
 replicas = 3
 
 HOST = ''    # Symbolic name meaning all available interfaces
-PORT = 12365 # Arbitrary non-privileged port
+PORT = 12415 # Arbitrary non-privileged port
 
 class KeyValueInfo:
     def __init__(self, key, value, time_stamp):
@@ -33,21 +33,26 @@ class KeyValueInfo:
 #Function for handling connections. This will be used to create threads
 def clientthread(conn):
     #Sending message to connected client
-    conn.send('Welcome to the server. \n') #send only takes string
+    conn.send('Welcome to the master server. \n') #send only takes string
      
     #infinite loop so that function do not terminate and thread do not end.
     while True:
          
         #Receiving from client
         try:
-            rep="key not found"
+            rep="Server Down,Please Try again in a few seconds"
             data = json.loads(conn.recv(1024))
 
             # hashkey = hashlib.sha256(data['KEY']).hexdigest()   #key hashing. uncomment this and the next line.
             # data['KEY'] = hashkey
+            
+            data['TIMESTAMP'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+            client_key=data['KEY']
+            key_hash=hashlib.sha256(client_key).hexdigest()
+            data['KEY'] = key_hash
 
             if(data['METHOD']== 'GET'): 
-                rep=get_from_dbnodes(data)
+                rep=get_from_dbnodes(data,0)
             elif(data['METHOD']=='POST'):
                 rep=post_to_dbnodes(data)
             else:
@@ -77,15 +82,25 @@ def clientthread(conn):
 
 
 def post_to_dbnode3(data):
-    s3 = socket.socket()         # Create a socket object
+    s3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)         # Create a socket object
+    # bind_port= 12334
+    try:
+        s3.bind(('localhost', 0))
+        print s3.getsockname()
+    except socket.error as msg:
+        print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+        sys.exit()
+    host1 = '24.72.242.230'      # Get local machine name
+    port1 = 12357                # Reserve a port for your service.
+    
+    try:
+        s3.connect((host1, port1))
 
-    host1 = '192.168.56.1'     # Get local machine name
-    port1 = 12357               # Reserve a port for your service.
-    s3.connect((host1, port1))
-
-    j_dump=json.dumps(data)
-    s3.send(j_dump)
-
+        j_dump=json.dumps(data)
+        s3.send(j_dump)
+    except socket.error as msg:
+        print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+        return '404'
     #set timeout on receive to avoid deadlock
     #if reply='404' then key not found, otherwise reply='OK'
     print 'blocking node 3'
@@ -103,27 +118,53 @@ def post_to_dbnode3(data):
     return reply3
  
 def post_to_dbnodes(data):
-    # acquire #unmutex mutex incase of multiple connections to same
+    # acquire mutex incase of multiple connections to same
     # db servers. Otherwise,If one connection completes, the port will 
     # be closed and will result in unpredictable behavior for the other connection.
     # Also, the sends from the dbnodes will be coming to the same port and IP and
     # two multiple connections won't be able to differentiate between the two.
-    #unmutex mutex.acquire()
+    print 'in post acquire'
+
+    mutex.acquire()
+
     getdata = data.copy()
     getdata['METHOD'] = 'GET'
-    getdata = get_from_dbnodes(getdata)
+    getdata = get_from_dbnodes(getdata,1)
     print 'I finished get'
+
+    if(getdata=='Server Down,Please Try again in a few seconds.'):
+        mutex.release()
+        return 'Server Down,Please Try again in a few seconds.'
+
     data['VECTOR_CLOCK'] = getdata['VECTOR_CLOCK']
     # needs to increase its own vector clock by 1
    
-    s1 = socket.socket()         # Create a socket object
-    s2 = socket.socket()         # Create a socket object
+    s1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)        # Create a socket object
+    s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)         # Create a socket object
 
-    host1 = '192.168.56.1'      # Get local machine name
-    port1 = 12358                # Reserve a port for your service.
+    print s1
+    print s2
+
+    s1.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    # bind_port= 12333
+    # bind_port1=12335
+    
+    try:
+        s1.bind(('', 0))
+        s2.bind(('', 0))
+        print s1.getsockname()
+        print s2.getsockname()
+    except socket.error as msg:
+        print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+        mutex.release()
+        sys.exit()
+
+    host1 = '24.72.242.230'      # Get local machine name
+    port1 = 12338                # Reserve a port for your service.
     s1.connect((host1, port1))
 
-    host2 = '192.168.56.1'      # Get local machine name
+    host2 = '24.72.242.230'      # Get local machine name
     port2 = 12359                # Reserve a port for your service.
     s2.connect((host2, port2))
 
@@ -156,7 +197,7 @@ def post_to_dbnodes(data):
     if(reply1=='OK' and reply2=='OK'):
         s1.close()
         s2.close()
-        #unmutex mutex.release()
+        mutex.release()
         return 'POST SUCCESS'
 
     elif((reply1=='404' and reply2=='OK') or (reply1=='OK' and reply2=='404') ):
@@ -166,48 +207,92 @@ def post_to_dbnodes(data):
         if (n3_rep=='OK'):
             s1.close()
             s2.close()
-            #unmutex mutex.release()
+            mutex.release()
             return 'POST SUCESS'
         else:
 	        s1.close()
 	        s2.close()
-	        #unmutex mutex.release()
+	        mutex.release()
 	        return 'Error: 2 of 3 Servers Down, Please try again in a few seconds'
     else:
-        #unmutex mutex.release()
+        mutex.release()
         return 'Error: 2 of 3 Servers Down, Please try again in a few seconds (Server 1 and Server 2)'
 
 
 # def ip_lookup(hash_key):
-def get_from_dbnodes(data):
-    # acquire #unmutex mutex incase of multiple connections to same
+def get_from_dbnodes(data,flag):
+    # acquire mutex incase of multiple connections to same
     # db servers. Otherwise,If one connection completes, the port will 
     # be closed and will result in unpredictable behavior for the other connection.
     # Also, the sends from the dbnodes will be coming to the same port and IP and
-    # two multiple connections won't be able to differentiate between the two.    
-    #unmutex mutex.acquire()
-    s1 = socket.socket()         # Create a socket object
-    s2 = socket.socket()         # Create a socket object
+    # two multiple connections won't be able to differentiate between the two. 
+    print 'in get'
 
-    host1 = '192.168.56.1'      # Get local machine name
-    port1 = 12358                # Reserve a port for your service.
-    s1.connect((host1, port1))
+    if(flag==0):   
+        mutex.acquire()
 
-    host2 = '192.168.56.1'      # Get local machine name
+    s1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)         # Create a socket object
+    s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)          # Create a socket object
+    s1.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)    
+    # bind_port= 12336
+    # bind_port1=12337
+    s1.settimeout(2)
+    s2.settimeout(2)
+
+    try:
+        s1.bind(('localhost', 0))
+        s2.bind(('localhost', 0))
+        print s1.getsockname()
+        print s2.getsockname()
+    except socket.error as msg:
+        print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+        if(flag==0):
+            mutex.release()
+        sys.exit()
+
+    host1 = '24.72.242.230'      # Get local machine name
+    port1 = 12338                # Reserve a port for your service.
+    
+
+    host2 = '24.72.242.230'      # Get local machine name
     port2 = 12359                # Reserve a port for your service.
-    s2.connect((host2, port2))
+
+    try:
+        print 'trying to connect'
+        s1.connect((host1, port1))
+        s2.connect((host2, port2))
+    except socket.error as msg:
+        print 'Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+        recent_reply="Server Down,Please Try again in a few seconds."
+        s1.close()
+        s2.close()
+        if(flag==0):
+            mutex.release()
+        return recent_reply
 
     print data
     j_dump=json.dumps(data)
-    s1.send(j_dump)
-    s2.send(j_dump)
-    reply1=json.loads(s1.recv(1024))    
-    reply2=json.loads(s2.recv(1024))
-    print reply1
-    print reply2
+
+    try:
+        s1.send(j_dump)
+        s2.send(j_dump)
+        reply1=json.loads(s1.recv(1024))    
+        reply2=json.loads(s2.recv(1024))
+        print reply1
+        print reply2
+    except socket.error as msg:
+        print 'Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+        recent_reply="Server Down,Please Try again in a few seconds."
+        s1.close()
+        s2.close()
+        if(flag==0):
+            mutex.release()
+        return recent_reply
 
     conflict = conflict_check(reply1['VECTOR_CLOCK'], reply2['VECTOR_CLOCK'])
     merged_vc = dict(sorted(chain(reply1['VECTOR_CLOCK'].items(), reply2['VECTOR_CLOCK'].items()), key=lambda t: t[1]))
+
     if conflict == 0: #Conflict occured
         #Pick higher timestamp reply and insert merged vector clock 
         print 'conflict occured'
@@ -227,9 +312,9 @@ def get_from_dbnodes(data):
     s1.close()
     s2.close()
 
-    print recent_reply
-
-    #unmutex mutex.release()
+    print 'recent reply:' + str(recent_reply)
+    if(flag==0):
+        mutex.release()
 
     return recent_reply
 
@@ -240,9 +325,11 @@ def conflict_check(rep1, rep2):
     #Returns 2 if reply2 is more recent
     print rep1
     print rep2
+
     rep1 = Counter(rep1)
     rep2 = Counter(rep2)
     rep1.subtract(rep2)
+
     print rep1
 
     if (all(rep1[key] >= 0 for key in rep1)): #differences all positive -> rep1 is more recent
