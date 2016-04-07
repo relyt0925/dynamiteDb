@@ -7,7 +7,7 @@ import datetime
 
 cmd = 0 #toggle to use cmd or static key/value
 
-method = 'POST'
+method = 'GET'
 key = 'dummy_key'
 value = 'hello'
 timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -29,14 +29,14 @@ if cmd == 1:
 
 s = socket.socket()         # Create a socket object
 host = socket.gethostname() # Get local machine name
-port = 12365                # Reserve a port for your service.
+port = 12415                # Reserve a port for your service.
 
 
 data = {}
 data['METHOD'] = method
 data['KEY'] = key
 data['VALUE'] = value
-data['TIMESTAMP'] = timestamp
+# data['TIMESTAMP'] = timestamp
 
 j_dump=json.dumps(data)
 s.connect((host, port))

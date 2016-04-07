@@ -8,12 +8,14 @@ from threading import Thread, Lock
 
 mutex = Lock()
 
-HOST = '192.168.56.1'
+HOST = '24.72.242.230'
 PORT = 12357               # Reserve a port for your service.
 
 data={}
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
 print 'Socket created'
  
 #Bind socket to local host and port
