@@ -80,13 +80,17 @@ public class AntiEntopyDeamon extends DaemonService {
 		//replica tracker is read only!
 		replicaItr=(replicaItr+1)%(ClientListener.replicaTracker.length-1);
 		lock.unlock();
+		//Get IP to do anti-entropy process with and find key range that will be exchanged
+		//Only nodes primary keys exchanged in anti-entropy process
 		String ipToConnectTo= ClientListener.replicaTracker[indexValue].ipAddress;
 		int portNumber=13000;
 		String startingKey=ClientListener.replicaTracker[0].hexEncodedKeyValue;
 		String endingKey= ClientListener.replicaTracker[0].hexEncodedKeyValue;
+		//retrieve total keyset 
 		ClientListener.keyLockMapLock.readLock().lock();
 		Set<String> keys=ClientListener.keyLockMap.keySet();
 		ClientListener.keyLockMapLock.readLock().unlock();
+		//for each key, see if it needs to be exchanged 
 		for(String i: keys){
 			ClientListener.keyLockMap.get(i).readLock().lock();
 			boolean releasedReadLock=false;
@@ -95,6 +99,7 @@ public class AntiEntopyDeamon extends DaemonService {
 			if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0){
 				try {
 					//System.out.println(fullPath);
+					//read in key value store object from persistent storage
 					FileInputStream fileIn = new FileInputStream(fullPath);
 					ObjectInputStream inStrem = new ObjectInputStream(fileIn);
 					KeyValueStore cmp= (KeyValueStore) inStrem.readObject();
@@ -102,10 +107,12 @@ public class AntiEntopyDeamon extends DaemonService {
 					inStrem.close();
 					ClientListener.keyLockMap.get(i).readLock().unlock();
 					releasedReadLock=true;
+					//create socket with remote DB node to exchange versions of key data
 					Socket remoteSocket = new Socket(InetAddress.getByName(ipToConnectTo), portNumber);
 					sendKeyValueStoreObject(cmp,remoteSocket);
 					String valueOfSentObject=cmp.getValue();
 					System.out.println(valueOfSentObject);
+					//read the updated version of the remote DB node
 					BufferedReader in = new BufferedReader(new InputStreamReader(
 							remoteSocket.getInputStream()));
 					String input = in.readLine();
@@ -122,6 +129,7 @@ public class AntiEntopyDeamon extends DaemonService {
 					//now get ready to serialize it if needed
 					ClientListener.keyLockMap.get(i).writeLock().lock();
 					releasedWriteLock=false;
+					//ip doesnt matter since it is anti entropy
 					String ip="DOESNTMATTER";
 					newData.updatePersistantStore(ip,true);
 					ClientListener.keyLockMap.get(i).writeLock().unlock();
@@ -137,40 +145,6 @@ public class AntiEntopyDeamon extends DaemonService {
 				}				
 			}	
 		}
-		
-		
 	}
+}
 
-}
-/*
-else{
-	keyLockMapLock.readLock().unlock();
-	//get read lock of specific key
-	//NOTE: IS IT ISSUE IF WRITE OCCURS TO LARGER DATA STRUCTURE????
-	keyLockMap.get(key).readLock().lock();
-	//now can get value
-	//key+=".ser";
-	String fullPath=resPath+key+".ser";
-	try {
-		//System.out.println(fullPath);
-		FileInputStream fileIn = new FileInputStream(fullPath);
-		ObjectInputStream in = new ObjectInputStream(fileIn);
-		KeyValueStore cmp= (KeyValueStore) in.readObject();
-		fileIn.close();
-		in.close();
-		keyLockMap.get(key).readLock().unlock();
-		//create json object and return it to client
-		sendKeyValueStoreObject(cmp);
-		String value=cmp.getValue();
-		System.out.println(value);
-		System.out.flush();
-	} catch (FileNotFoundException noFile) {
-		//Shouldnt be case if a key is in the hashmap
-		System.out.print("ERROR: WHY IS THERE KEY IN HASHMAP IF FILENOTFOUND");
-	}
-	catch(Exception e){
-		//otherwise we have a bad exception and need to fail
-		e.printStackTrace();
-	}	
-}
-*/
