@@ -10,7 +10,7 @@ def testGet():
     host = 'localhost' # Get local machine name
     port = 13000                # Reserve a port for your service.
     data = {}
-    keyy='HEYYYY'
+    keyy='IROCKKKKKKKK'
     kevVal=hashlib.sha256(keyy).hexdigest()
     data['KEY'] = kevVal
     data['METHOD'] = 'GET'

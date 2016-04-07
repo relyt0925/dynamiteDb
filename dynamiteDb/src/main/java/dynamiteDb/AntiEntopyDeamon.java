@@ -90,16 +90,19 @@ public class AntiEntopyDeamon extends DaemonService {
 		ClientListener.keyLockMapLock.readLock().lock();
 		Set<String> keys=ClientListener.keyLockMap.keySet();
 		ClientListener.keyLockMapLock.readLock().unlock();
+		System.out.println("UNLOCKED MAJOR HASHMAP KEY");
 		//for each key, see if it needs to be exchanged 
 		for(String i: keys){
-			ClientListener.keyLockMap.get(i).readLock().lock();
-			boolean releasedReadLock=false;
+			System.out.println("KEY IS: "+i);
+			boolean releasedReadLock=true;
 			boolean releasedWriteLock=true;
 			String fullPath=resourcePath+i+".ser";
-			if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0){
+			if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0 || true){
 				try {
 					//System.out.println(fullPath);
 					//read in key value store object from persistent storage
+					ClientListener.keyLockMap.get(i).readLock().lock();
+					releasedReadLock=false;
 					FileInputStream fileIn = new FileInputStream(fullPath);
 					ObjectInputStream inStrem = new ObjectInputStream(fileIn);
 					KeyValueStore cmp= (KeyValueStore) inStrem.readObject();
@@ -107,8 +110,10 @@ public class AntiEntopyDeamon extends DaemonService {
 					inStrem.close();
 					ClientListener.keyLockMap.get(i).readLock().unlock();
 					releasedReadLock=true;
+					System.out.println("UNLOCKED KEY LOCK");
 					//create socket with remote DB node to exchange versions of key data
 					Socket remoteSocket = new Socket(InetAddress.getByName(ipToConnectTo), portNumber);
+					System.out.print("PAST SOCKET CREATION");
 					sendKeyValueStoreObject(cmp,remoteSocket);
 					String valueOfSentObject=cmp.getValue();
 					System.out.println(valueOfSentObject);
@@ -128,16 +133,20 @@ public class AntiEntopyDeamon extends DaemonService {
 					KeyValueStore newData= new KeyValueStore(key,value,time,vectClock);
 					//now get ready to serialize it if needed
 					ClientListener.keyLockMap.get(i).writeLock().lock();
+					System.out.println("LOCKED WRITE KEY LOCK");
 					releasedWriteLock=false;
 					//ip doesnt matter since it is anti entropy
 					String ip="DOESNTMATTER";
 					newData.updatePersistantStore(ip,true);
 					ClientListener.keyLockMap.get(i).writeLock().unlock();
+					System.out.println("UNLOCKED WRITE KEY LOCK");
 					releasedWriteLock=true;
+					
 				}
 				catch (Exception e) {
 					//Shouldnt be case if a key is in the hashmap
 					e.printStackTrace();
+					System.out.print("ERROR OCCURED");
 					if(!releasedReadLock)
 						ClientListener.keyLockMap.get(i).readLock().unlock();
 					if(!releasedWriteLock)

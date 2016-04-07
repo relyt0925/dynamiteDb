@@ -93,6 +93,9 @@ public class KeyValueServer {
 		for(File i : listOfFiles){
 			System.out.println(i.getName().substring(0, i.getName().lastIndexOf('.')));
 			String hexKey=i.getName().substring(0, i.getName().lastIndexOf('.'));
+			if(hexKey.isEmpty()){
+				continue;				
+			}
 			initKeyToLockMap.put(hexKey, new ReentrantReadWriteLock());
 		}
 		return initKeyToLockMap;
