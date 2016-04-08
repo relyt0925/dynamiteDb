@@ -8,7 +8,7 @@ from threading import Thread, Lock
 
 mutex = Lock()
 
-HOST = '24.72.242.230'
+HOST = '192.168.56.1'
 PORT = 12357               # Reserve a port for your service.
 
 data={}

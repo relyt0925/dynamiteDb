@@ -14,12 +14,12 @@ from itertools import chain
 from threading import Thread, Lock
 
 mutex = Lock()
-
+testip = '192.168.56.1'
+hashtestip = hashlib.sha256(testip).hexdigest()
 dbnodes_ip_hash=[]
 dbnodes_ip=[]
-rcount = 2
-wcount = 2
-replicas = 3
+
+masterid = 'Master1/192.168.2.3'
 
 HOST = ''    # Symbolic name meaning all available interfaces
 PORT = 12415 # Arbitrary non-privileged port
@@ -91,7 +91,7 @@ def clientthread(conn):
             
             client_key=data['KEY']
             key_hash=hashlib.sha256(client_key).hexdigest()
-            # ip='24.72.242.230'
+            # ip='192.168.56.1'
             # print hashlib.sha256(ip).hexdigest()
             data['KEY'] = key_hash
 
@@ -183,12 +183,12 @@ def post_to_dbnodes(data):
         mutex.release()
         return 'Server Down,Please Try again in a few seconds.'
     elif(getdata=='404'):
-       data['VECTOR_CLOCK'] = {}
+       data['VECTOR_CLOCK'] = {masterid:1}
        data['TIMESTAMP'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
     else:
         data['VECTOR_CLOCK'] = getdata['VECTOR_CLOCK']
+        data['VECTOR_CLOCK'][masterid] = data['VECTOR_CLOCK'].get(masterid, 0) + 1  #increment its own VC by 1 or add entry of value 1
         data['TIMESTAMP'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-    # needs to increase its own vector clock by 1
 
     ip_array=lookup_ip(data['KEY'])
     print ip_array
@@ -315,7 +315,7 @@ def get_from_dbnodes(data,flag):
     port2 = 12359                # Reserve a port for your service.
 
     try:
-        print 'trying to connect'
+        print 'trying to connect to ' + host1 + ':' + str(port1) +' and ' + host2 + ':' + str(port2)
         s1.connect((host1, port1))
         s2.connect((host2, port2))
     except socket.error as msg:
@@ -346,7 +346,7 @@ def get_from_dbnodes(data,flag):
             mutex.release()
         return recent_reply
 
-    if(reply1=='404' or reply2=='404'):
+    if(reply1['METHOD']=='NOVAL' or reply2['METHOD']=='NOVAL'):
         return '404'
 
     conflict = conflict_check(reply1['VECTOR_CLOCK'], reply2['VECTOR_CLOCK'])
@@ -365,7 +365,8 @@ def get_from_dbnodes(data,flag):
             recent_reply = reply1
         elif conflict == 2:
             recent_reply = reply2
-    
+
+
     recent_reply['VECTOR_CLOCK'] = merged_vc #insert merged vector clock
 
     s1.close()
