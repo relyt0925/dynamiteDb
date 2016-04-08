@@ -166,7 +166,7 @@ public class ClientListener extends Thread {
             e.printStackTrace();
         }
 		keyLockMap.get(key).writeLock().unlock();
-		sendKeyValueStoreObject(newData);	
+		sendKeyValueStoreObject(newData,"ANTI_ENTROPY");	
 	}
 	
 	
@@ -224,15 +224,16 @@ public class ClientListener extends Thread {
         }
 		keyLockMap.get(key).writeLock().unlock();
 		//send updated data back to client
-		sendKeyValueStoreObject(newData);	
+		sendKeyValueStoreObject(newData,"PUT");	
 	}
 	/**
 	 * sendKeyValueStoreObject- sends keyValueStore object as json to client
 	 * @param a KeyValueStore object that will be sent  to client
 	 */
-	private void sendKeyValueStoreObject(KeyValueStore a){
+	private void sendKeyValueStoreObject(KeyValueStore a,String method){
 		JSONObject jsonObj= new JSONObject();
 		try {
+			jsonObj.put("METHOD",method);
 			jsonObj.put("KEY", a.getHexEncodedKey());
 			jsonObj.put("VALUE",a.getValue());
 			jsonObj.put("TIMESTAMP", a.getTimeStamp().toString());
@@ -302,7 +303,7 @@ public class ClientListener extends Thread {
 				keyLockMap.get(key).readLock().unlock();
 				releasedLock=true;
 				//create json object and return it to client
-				sendKeyValueStoreObject(cmp);
+				sendKeyValueStoreObject(cmp,"GET");
 				String value=cmp.getValue();
 				System.out.println(value);
 				System.out.flush();

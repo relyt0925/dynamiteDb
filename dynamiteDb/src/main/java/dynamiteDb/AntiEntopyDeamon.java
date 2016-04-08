@@ -44,6 +44,7 @@ public class AntiEntopyDeamon extends DaemonService {
 	private void sendKeyValueStoreObject(KeyValueStore a, Socket socket){
 		JSONObject jsonObj= new JSONObject();
 		try {
+			jsonObj.put("METHOD", "ANTI_ENTROPY");
 			jsonObj.put("KEY", a.getHexEncodedKey());
 			jsonObj.put("VALUE",a.getValue());
 			jsonObj.put("TIMESTAMP", a.getTimeStamp().toString());
@@ -62,7 +63,7 @@ public class AntiEntopyDeamon extends DaemonService {
 			out.write(jsonObj.toString());
 			out.write("\n");
 			out.flush();
-			out.close();
+			//out.close();
 			//socket.close();
 			System.out.println(jsonObj.toString());
 		}
@@ -83,6 +84,7 @@ public class AntiEntopyDeamon extends DaemonService {
 		//Get IP to do anti-entropy process with and find key range that will be exchanged
 		//Only nodes primary keys exchanged in anti-entropy process
 		String ipToConnectTo= ClientListener.replicaTracker[indexValue].ipAddress;
+		//ipToConnectTo="127.0.0.1";
 		int portNumber=13000;
 		String startingKey=ClientListener.replicaTracker[0].hexEncodedKeyValue;
 		String endingKey= ClientListener.replicaTracker[0].hexEncodedKeyValue;
@@ -113,7 +115,7 @@ public class AntiEntopyDeamon extends DaemonService {
 					System.out.println("UNLOCKED KEY LOCK");
 					//create socket with remote DB node to exchange versions of key data
 					Socket remoteSocket = new Socket(InetAddress.getByName(ipToConnectTo), portNumber);
-					System.out.print("PAST SOCKET CREATION");
+					System.out.println(remoteSocket.isConnected());
 					sendKeyValueStoreObject(cmp,remoteSocket);
 					String valueOfSentObject=cmp.getValue();
 					System.out.println(valueOfSentObject);
@@ -121,8 +123,10 @@ public class AntiEntopyDeamon extends DaemonService {
 					BufferedReader in = new BufferedReader(new InputStreamReader(
 							remoteSocket.getInputStream()));
 					String input = in.readLine();
+					System.out.println(input);
 					JSONObject jsonObj = new JSONObject(input);
-					remoteSocket.close();
+					if(!remoteSocket.isClosed())
+						remoteSocket.close();
 					//construct the received object
 					String key = jsonObj.getString("KEY");
 					String value = jsonObj.getString("VALUE");
