@@ -99,7 +99,9 @@ public class AntiEntopyDeamon extends DaemonService {
 			boolean releasedReadLock=true;
 			boolean releasedWriteLock=true;
 			String fullPath=resourcePath+i+".ser";
-			if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0 || true){
+			//this is to test process with every key!!! it works
+			//if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0 || true)
+			if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0){
 				try {
 					//System.out.println(fullPath);
 					//read in key value store object from persistent storage
