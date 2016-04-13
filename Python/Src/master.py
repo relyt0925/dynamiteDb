@@ -14,12 +14,12 @@ from itertools import chain
 from threading import Thread, Lock
 
 mutex = Lock()
-testip = '54.85.66.252'
+testip = ''
 hashtestip = hashlib.sha256(testip).hexdigest()
 dbnodes_ip_hash=[]
 dbnodes_ip=[]
 
-masterid = 'Master1/54.85.66.252'
+masterid = 'Master1/'
 
 HOST = testip    # Symbolic name meaning all available interfaces
 PORT = 12415 # Arbitrary non-privileged port
@@ -137,7 +137,7 @@ def get_from_dbnode3(data,ip):
     # bind_port= 12334
     print 'trying to get from 3 node = ' +str(ip)
     try:
-        s3.bind(('54.85.66.252', 0))
+        s3.bind(('', 0))
         print s3.getsockname()
     except socket.error as msg:
         print 'Error Code : ' + str(msg)
@@ -178,7 +178,7 @@ def post_to_dbnode3(data,ip):
     s3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)         # Create a socket object
     # bind_port= 12334
     try:
-        s3.bind(('54.85.66.252', 0))
+        s3.bind(('', 0))
         print s3.getsockname()
     except socket.error as msg:
         print 'Error Code : ' + str(msg)
@@ -262,8 +262,8 @@ def post_to_dbnodes(data):
     j_dump=json.dumps(data)
 
     try:
-        s1.bind(('54.85.66.252', 0))
-        s2.bind(('54.85.66.252', 0))
+        s1.bind(('', 0))
+        s2.bind(('', 0))
         print s1.getsockname()
         print s2.getsockname()
     except socket.error as msg:
@@ -366,8 +366,8 @@ def get_from_dbnodes(data,flag):
     s2.settimeout(1)
 
     try:
-        s1.bind(('54.85.66.252', 0))
-        s2.bind(('54.85.66.252', 0))
+        s1.bind(('', 0))
+        s2.bind(('', 0))
         print s1.getsockname()
         print s2.getsockname()
     except socket.error as msg:
