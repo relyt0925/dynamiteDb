@@ -4,12 +4,15 @@ import socket               # Import socket module
 import json
 import argparse
 import datetime
+import random
 
 cmd = 0 #toggle to use cmd or static key/value
 
-method = 'GET'
-key = 'dummy_key'
-value = 'hello'
+method = 'PUT'
+# key='dummy_key'
+key = str(random.randint(0,100))
+print key
+value = 'Yaksh'
 timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
@@ -28,7 +31,7 @@ if cmd == 1:
 	method = args.method
 
 s = socket.socket()         # Create a socket object
-host = socket.gethostname() # Get local machine name
+host = '24.72.242.230' # Get local machine name
 port = 12415                # Reserve a port for your service.
 
 
