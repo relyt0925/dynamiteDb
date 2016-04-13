@@ -132,6 +132,47 @@ def clientthread(conn):
     #came out of loop
     conn.close()
 
+def get_from_dbnode3(data,ip):
+    s3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)         # Create a socket object
+    # bind_port= 12334
+    print 'trying to get from 3 node = ' +str(ip)
+    try:
+        s3.bind(('24.72.242.230', 0))
+        print s3.getsockname()
+    except socket.error as msg:
+        print 'Error Code : ' + str(msg)
+        sys.exit()
+    host1 = ip      # Get local machine name
+    port1 = 13000                # Reserve a port for your service.
+    
+    s3.settimeout(1)
+
+    try:
+        s3.connect((host1, port1))
+
+        j_dump=json.dumps(data)
+        s3.send(b''+j_dump+'\n')
+    except socket.error as msg:
+        print 'Error Code : ' + str(msg)
+        return '404'
+    #set timeout on receive to avoid deadlock
+    #if reply='404' then key not found, otherwise reply='OK'
+    print 'blocking get node 3=' + str(ip)
+
+    
+
+    try:
+        # print 'here\n'
+        reply3=json.loads(s3.recv(1024))
+        print reply3
+    except socket.error as err:
+        reply3='404'
+        print (err)    
+
+    s3.close()
+    return reply3
+
+
 
 def post_to_dbnode3(data,ip):
     s3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)         # Create a socket object
@@ -145,22 +186,24 @@ def post_to_dbnode3(data,ip):
     host1 = ip      # Get local machine name
     port1 = 13000                # Reserve a port for your service.
     
+    s3.settimeout(1)
+
     try:
         s3.connect((host1, port1))
 
         j_dump=json.dumps(data)
-        s3.send(j_dump)
+        s3.send(b''+j_dump+'\n')
     except socket.error as msg:
         print 'Error Code : ' + str(msg)
         return '404'
     #set timeout on receive to avoid deadlock
     #if reply='404' then key not found, otherwise reply='OK'
-    print 'blocking on node 3'
-    s3.settimeout(2)
+    print 'blocking post node 3=' + str(ip)
+    
 
     try:
         # print 'here\n'
-        reply3=s3.recv(1024)
+        reply3=json.loads(s3.recv(1024))
         print reply3
     except socket.error as err:
         reply3='404'
@@ -173,9 +216,10 @@ def post_to_dbnodes(data):
     # acquire mutex incase of multiple connections to same
     # db servers. Otherwise,If one connection completes, the port will 
     # be closed and will result in unpredictable behavior for the other connection.
-    # Also, the sends from the dbnodes will be coming to the same port and IP and
-    # two multiple connections won't be able to differentiate between the two.
+
     print 'in post acquire'
+
+    server_fail=0
 
     mutex.acquire()
 
@@ -210,6 +254,13 @@ def post_to_dbnodes(data):
     # bind_port= 12333
     # bind_port1=12335
     
+    host1 = ip_array[0].split("\n")[0]      # Get local machine name
+    port1 = 13000
+    host2 = ip_array[1].split("\n")[0]      # Get local machine name
+    port2 = 13000
+
+    j_dump=json.dumps(data)
+
     try:
         s1.bind(('24.72.242.230', 0))
         s2.bind(('24.72.242.230', 0))
@@ -221,63 +272,51 @@ def post_to_dbnodes(data):
         sys.exit()
 
     print ip_array[0].split("\n")[0]
+    s1.settimeout(1)
+    s2.settimeout(1)
 
-    try:
-
-        host1 = ip_array[0].split("\n")[0]      # Get local machine name
-        port1 = 13000                # Reserve a port for your service.
+    try: 
         s1.connect((host1, port1))
-
-        host2 = ip_array[1].split("\n")[0]      # Get local machine name
-        port2 = 13000                # Reserve a port for your service.
-        s2.connect((host2, port2))
-
-    except socket.error as msg:
-        print 'Error Code : ' + str(msg)
-        recent_reply="Server Down,Please Try again in a few seconds."
-        s1.close()
-        s2.close()
-
-        mutex.release()
-        return recent_reply
-
-
-    j_dump=json.dumps(data)
-
-    try:
-        print data
         s1.send(b''+j_dump+'\n')
-        s2.send(b''+j_dump+'\n')
+        reply1=json.loads(s1.recv(1024))
+        print reply1
     except socket.error as msg:
-        print 'Error Code : ' + str(msg)
+        print 'Error Code : ' + str(msg) + str(host1)
         recent_reply="Server Down,Please Try again in a few seconds."
-        s1.close()
-        s2.close()
+        # s1.close()
+        # s2.close()
+        server_fail=server_fail+1
 
-        mutex.release()
-        return recent_reply
-
-    print 'blocking on node 1 and 2'
-
-    #set timeout on receive to avoid deadlock
-    #if reply='404' then key not found, otherwise reply='OK'
-    s1.settimeout(4)
-    s2.settimeout(4)
-
-    try:
-        reply2=s2.recv(1024)
-        print 'this ' + str(reply2)
-    except socket.error as err:
-        reply2='404'
-        print (err)  
-
-    try:
-        reply1=s1.recv(1024)
-        print 'this ' + str(reply1)
-    except socket.error as err:
-        print (err)
         reply1='404'
-      
+        if(server_fail==2):
+
+            mutex.release()        
+            s1.close()
+            s2.close()     
+            # mutex.release()
+            return recent_reply        
+
+    try:
+        s2.connect((host2, port2))
+        s2.send(b''+j_dump+'\n')
+        reply2=json.loads(s2.recv(1024))
+        print reply2
+    except socket.error as msg:
+        print 'Error Code : ' + str(msg) + str(host2)
+        recent_reply="Server Down,Please Try again in a few seconds."
+        # s1.close()
+        # s2.close()
+        server_fail=server_fail+1
+
+        reply2='404'
+        if(server_fail==2):
+
+            mutex.release()        
+            s1.close()
+            s2.close()     
+            # mutex.release()
+            return recent_reply 
+
 
     if(reply1!='404' and reply2!='404'):
         s1.close()
@@ -293,7 +332,7 @@ def post_to_dbnodes(data):
             s1.close()
             s2.close()
             mutex.release()
-            return 'POST SUCESS'
+            return 'POST SUCCESS'
         else:
 	        s1.close()
 	        s2.close()
@@ -309,9 +348,10 @@ def get_from_dbnodes(data,flag):
     # acquire mutex incase of multiple connections to same
     # db servers. Otherwise,If one connection completes, the port will 
     # be closed and will result in unpredictable behavior for the other connection.
-    # Also, the sends from the dbnodes will be coming to the same port and IP and
-    # two multiple connections won't be able to differentiate between the two. 
+ 
     print 'in get'
+
+    server_fail=0
 
     if(flag==0):   
         mutex.acquire()
@@ -322,8 +362,8 @@ def get_from_dbnodes(data,flag):
     s2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)    
     # bind_port= 12336
     # bind_port1=12337
-    s1.settimeout(5)
-    s2.settimeout(5)
+    s1.settimeout(1)
+    s2.settimeout(1)
 
     try:
         s1.bind(('24.72.242.230', 0))
@@ -345,46 +385,68 @@ def get_from_dbnodes(data,flag):
     host2 = ip_array[1].split("\n")[0]       # Get local machine name
     port2 = 13000                # Reserve a port for your service.
 
-    try:
-        print 'trying to connect to ' + host1 + ':' + str(port1) +' and ' + host2 + ':' + str(port2)
-        s1.connect((host1, port1))
-        s2.connect((host2, port2))
-    except socket.error as msg:
-        print 'Error Code : ' + str(msg)
-        recent_reply="Server Down,Please Try again in a few seconds."
-        s1.close()
-        s2.close()
-        if(flag==0):
-            mutex.release()
-        return recent_reply
+    print 'trying to connect to ' + host1 + ':' + str(port1) +' and ' + host2 + ':' + str(port2)
 
     print data
     j_dump=json.dumps(data)
 
-    try:
+    try: 
+        s1.connect((host1, port1))
         s1.send(b''+j_dump+'\n')
-        s2.send(b''+j_dump+'\n')
-    except socket.error as msg:
-        print 'Error Code : ' + str(msg)
-        recent_reply="Server Down,Please Try again in a few seconds."
-        s1.close()
-        s2.close()
-        if(flag==0):
-            mutex.release()
-        return recent_reply
-    try:
-        reply1=json.loads(s1.recv(1024))    
-        reply2=json.loads(s2.recv(1024))
+        reply1=json.loads(s1.recv(1024))
         print reply1
+    except socket.error as msg:
+        print 'Error Code : ' + str(msg) + str(host1)
+        recent_reply="Server Down,Please Try again in a few seconds."
+        # s1.close()
+        # s2.close()
+        server_fail=server_fail+1
+        reply1='404'
+        if(server_fail==2):
+            if(flag==0):
+                mutex.release()        
+            s1.close()
+            s2.close()     
+            # mutex.release()
+            return recent_reply        
+
+    try:
+        s2.connect((host2, port2))
+        s2.send(b''+j_dump+'\n')
+        reply2=json.loads(s2.recv(1024))
         print reply2
     except socket.error as msg:
-        print 'Error Code : ' + str(msg)
+        print 'Error Code : ' + str(msg) + str(host2)
         recent_reply="Server Down,Please Try again in a few seconds."
-        s1.close()
-        s2.close()
-        if(flag==0):
-            mutex.release()
-        return recent_reply
+        # s1.close()
+        # s2.close()
+        server_fail=server_fail+1
+        reply2='404'
+        if(server_fail==2):
+            if(flag==0):
+                mutex.release()        
+            s1.close()
+            s2.close()     
+            # mutex.release()
+            return recent_reply 
+
+
+    if(server_fail==1):
+        if(reply1=='404'):
+            reply1=get_from_dbnode3(data,ip_array[2].split("\n")[0])
+            if(reply1=='404'):
+                if(flag==0):
+                    mutex.release()
+                return "Server Down,Please Try again in a few seconds."
+        else:
+            reply2=get_from_dbnode3(data,ip_array[2].split("\n")[0])
+            if(reply2=='404'):
+                if(flag==0):
+                    mutex.release()
+                return "Server Down,Please Try again in a few seconds."
+
+    print reply1
+    print reply2
 
     if(reply1['METHOD']=='NOVAL' or reply2['METHOD']=='NOVAL'):
         if(flag==0):
@@ -415,7 +477,6 @@ def get_from_dbnodes(data,flag):
     s2.close()
 
     print 'recent reply:' + str(recent_reply)
-    
     if(flag==0):
         mutex.release()
 
