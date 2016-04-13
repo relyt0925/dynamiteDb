@@ -9,8 +9,8 @@ import random
 cmd = 0 #toggle to use cmd or static key/value
 
 method = 'PUT'
-# key='dummy_key'
-key = str(random.randint(0,100))
+key='dummy_key'
+#key = str(random.randint(0,100))
 print key
 value = 'Yaksh'
 timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
