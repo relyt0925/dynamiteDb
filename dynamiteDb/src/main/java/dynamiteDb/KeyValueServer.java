@@ -13,10 +13,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.FileHandler;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 import org.apache.commons.codec.binary.Hex;
 
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Timer;
 
@@ -31,6 +35,7 @@ public class KeyValueServer {
 	public final static String METHOD_GET = "GET";
 	public final static String METHOD_PUT = "PUT";
 	public final static String METHOD_ANTI_ENTROPY = "ANTI_ENTROPY";
+	public final static String LOG = "Log";
 	/**
 	 * ipAddressList- List of IPs of all database nodes
 	 */
@@ -52,6 +57,11 @@ public class KeyValueServer {
 		generateConfigFile();
 		HashMap<String,ReadWriteLock> initKeyToLockMap= getListOfKeyFiles();
 		ClientListener.setInitKeyLockHashmap(initKeyToLockMap);
+		Logger logger = Logger.getLogger(LOG);
+		FileHandler fh = new FileHandler("Logs/"+new Date().getTime()+".log");  
+	    logger.addHandler(fh);
+	    SimpleFormatter formatter = new SimpleFormatter();  
+	    fh.setFormatter(formatter); 
 		/*
 		if(hey){
 			ConfigFileEntry[] replicaTrack=generateReplicaTracker();
@@ -71,6 +81,7 @@ public class KeyValueServer {
 		Timer timer = new Timer();
 		DaemonServicesHandler daemonHandler = new DaemonServicesHandler();
 		daemonHandler.addDaemonService(new AntiEntopyDeamon(30));
+		daemonHandler.addDaemonService(new StatsDaemon(10));
 		timer.scheduleAtFixedRate(new DaemonServicesHandler(), 1000, 1000);
 
 	        try {
@@ -141,7 +152,8 @@ public class KeyValueServer {
 			}
 		}
 		Arrays.sort(configArray);
-		String myIp=getPublicIp();
+		//String myIp=getPublicIp();
+		String myIp = "52.201.0.131";
 		int foundIndex=0;
 		//find where IP is in the sorted array
 		for(int i=0;i<configArray.length;i++){
