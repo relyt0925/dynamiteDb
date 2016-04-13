@@ -30,7 +30,8 @@ if cmd == 1:
 	method = args.method
 
 s = socket.socket()         # Create a socket object
-host = '24.72.242.230' # Get local machine name
+host= 'masterLoadBalancer-759916868.us-east-1.elb.amazonaws.com'
+#host = '54.85.66.252' # Get local machine name
 port = 12415                # Reserve a port for your service.
 
 
