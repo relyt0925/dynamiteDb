@@ -188,7 +188,7 @@ public class KeyValueServer {
 		//get nodes greater than my replica
 		System.out.println("GREATER INDEXER");
 		for(int i=numReplicas+1;i<((2*numReplicas)+1);i++){
-			int indexer=(foundIndex+i)%configArray.length;
+			int indexer=(foundIndex+(i-numReplicas))%configArray.length;
 			System.out.println("INDEXER: "+Integer.toString(indexer));
 			//System.out.println(indexer);
 			ConfigFileEntry entry = new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
