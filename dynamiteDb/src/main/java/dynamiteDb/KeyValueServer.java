@@ -122,6 +122,7 @@ public class KeyValueServer {
 		try{
 			byte[] encoded = Files.readAllBytes(Paths.get("src/main/resources/ip/hostIp.conf"));
 			String ip= new String(encoded,StandardCharsets.US_ASCII);
+			System.out.println("IP FROM FILE IS:" +ip);
 			return ip;
 		}
 		catch(IOException e){
