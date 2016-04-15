@@ -133,7 +133,9 @@ public class AntiEntopyDeamon extends DaemonService {
 				if(i.compareTo(endingKey)<0 || i.compareTo(startingKey)>=0)
 					isInRange=true;
 			}
-			//this is to test process with every key!!! it works
+			System.out.println("IS IN RANGE");
+			System.out.println(isInRange);
+			//this is to test process with every key!!! it wor
 			//if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0 || true)
 			if(isInRange){
 				try {
