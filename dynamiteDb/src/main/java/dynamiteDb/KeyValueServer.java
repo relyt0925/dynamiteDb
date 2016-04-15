@@ -178,7 +178,7 @@ public class KeyValueServer {
 			if(indexer<0){
 				indexer=ipAddressList.length+indexer;
 			}
-			System.out.println("INDEXER: "+Integer.toString(i));
+			System.out.println("INDEXER: "+Integer.toString(indexer));
 			replicaTracker[i]= new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
 		}
 		//insert my node into the proper spot
