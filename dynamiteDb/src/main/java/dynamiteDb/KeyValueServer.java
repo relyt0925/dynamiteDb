@@ -196,7 +196,7 @@ public class KeyValueServer {
 		}
 		System.out.println("END REPLICA CREATOR");
 		for(int i=0;i<replicaTracker.length;i++){
-			System.out.println(configArray[i].ipAddress+"  "+ configArray[i].hexEncodedKeyValue);
+			System.out.println(replicaTracker[i].ipAddress+"  "+ replicaTracker[i].hexEncodedKeyValue);
 		}
 		return replicaTracker;			
 	}
