@@ -77,17 +77,36 @@ public class AntiEntopyDeamon extends DaemonService {
 		// TODO Auto-generated method stub
 		System.out.println("Anti-Entropy Process");	
 		lock.lock();
-		int indexValue=replicaItr+1;
+		int indexValue=replicaItr;
 		//replica tracker is read only!
-		replicaItr=(replicaItr+1)%(ClientListener.replicaTracker.length-1);
+		//need to skip over own nodes ip (no need to do anti-entropy process with self)
+		//OWN NODE ALWAYS AT INDEX KeyValueServer.numReplicas
+		if(replicaItr==KeyValueServer.numReplicas-1)
+			replicaItr=(replicaItr+2)%(ClientListener.replicaTracker.length);
+		else
+			replicaItr=(replicaItr+1)%(ClientListener.replicaTracker.length);
 		lock.unlock();
 		//Get IP to do anti-entropy process with and find key range that will be exchanged
 		//Only nodes primary keys exchanged in anti-entropy process
 		String ipToConnectTo= ClientListener.replicaTracker[indexValue].ipAddress;
 		//ipToConnectTo="127.0.0.1";
 		int portNumber=13000;
-		String startingKey=ClientListener.replicaTracker[0].hexEncodedKeyValue;
-		String endingKey= ClientListener.replicaTracker[0].hexEncodedKeyValue;
+		int logicalNodeDistanceAway=indexValue-KeyValueServer.numReplicas;
+		int startKeyIndex;
+		int endKeyIndex;
+		if(logicalNodeDistanceAway>0){
+			//start key is based on index difference away from replica
+			//ie( if only one index away start key should be the index above current node)
+			//if two away startKeyIndex should just be current node
+			startKeyIndex=KeyValueServer.numReplicas-(KeyValueServer.numReplicas-logicalNodeDistanceAway);
+			endKeyIndex=KeyValueServer.numReplicas+1;
+		}
+		else{
+			startKeyIndex=0;
+			endKeyIndex=KeyValueServer.numReplicas+logicalNodeDistanceAway+1;
+		}
+		String startingKey=ClientListener.replicaTracker[startKeyIndex].hexEncodedKeyValue;
+		String endingKey= ClientListener.replicaTracker[endKeyIndex].hexEncodedKeyValue;
 		//retrieve total keyset 
 		ClientListener.keyLockMapLock.readLock().lock();
 		Set<String> keys=ClientListener.keyLockMap.keySet();
@@ -99,9 +118,24 @@ public class AntiEntopyDeamon extends DaemonService {
 			boolean releasedReadLock=true;
 			boolean releasedWriteLock=true;
 			String fullPath=resourcePath+i+".ser";
+			boolean isInRange=false;
+			//if starting key is less than the ending key
+			if(startingKey.compareTo(endingKey)<0){
+				if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0)
+					isInRange=true;
+			}
+			else if(startingKey.compareTo(endingKey)==0){
+				//they are same and need the whole range of values
+				isInRange=true;
+			}
+			else{
+				//if the startingKey is greater than the ending key, check both ranges
+				if(i.compareTo(endingKey)<0 || i.compareTo(startingKey)>=0)
+					isInRange=true;
+			}
 			//this is to test process with every key!!! it works
 			//if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0 || true)
-			if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0){
+			if(isInRange){
 				try {
 					//System.out.println(fullPath);
 					//read in key value store object from persistent storage
@@ -147,7 +181,6 @@ public class AntiEntopyDeamon extends DaemonService {
 					ClientListener.keyLockMap.get(i).writeLock().unlock();
 					System.out.println("UNLOCKED WRITE KEY LOCK");
 					releasedWriteLock=true;
-					
 				}
 				catch (Exception e) {
 					//Shouldnt be case if a key is in the hashmap

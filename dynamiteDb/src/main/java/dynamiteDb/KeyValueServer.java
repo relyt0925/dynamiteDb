@@ -36,6 +36,7 @@ public class KeyValueServer {
 	public final static String METHOD_PUT = "PUT";
 	public final static String METHOD_ANTI_ENTROPY = "ANTI_ENTROPY";
 	public final static String LOG = "Log";
+	public final static int numReplicas=2;
 	/**
 	 * ipAddressList- List of IPs of all database nodes
 	 */
@@ -152,8 +153,8 @@ public class KeyValueServer {
 			}
 		}
 		Arrays.sort(configArray);
-		//String myIp=getPublicIp();
-		String myIp = "52.201.0.131";
+		String myIp=getPublicIp();
+		//String myIp = "52.201.0.131";
 		int foundIndex=0;
 		//find where IP is in the sorted array
 		for(int i=0;i<configArray.length;i++){
@@ -165,8 +166,21 @@ public class KeyValueServer {
 		}
 		//set to 3 because 2 replicas
 		//and now find replicas (the next entries does mod to return back to start if need be)
-		ConfigFileEntry[] replicaTracker= new ConfigFileEntry[3];
-		for(int i=0;i<3;i++){
+		ConfigFileEntry[] replicaTracker= new ConfigFileEntry[ipAddressList.length];
+		//NOTE: THIS ONLY WORKS FOR CASE OF 5 with replication factor of 3
+		//IT WILL JUST PUT THE ENTRIES IN THE 
+		for(int i=0;i<numReplicas;i++){
+			//find my secondary keyset, and tietary keyset
+			int indexer=(foundIndex-(i+1));
+			if(indexer<0){
+				indexer=ipAddressList.length+indexer;
+			}
+			replicaTracker[i]= new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
+		}
+		//insert my node into the proper spot
+		replicaTracker[numReplicas]= new ConfigFileEntry(configArray[foundIndex].ipAddress,configArray[foundIndex].hexEncodedKeyValue);
+		//get nodes greater than my replica
+		for(int i=numReplicas+1;i<((2*numReplicas)+1);i++){
 			int indexer=(foundIndex+i)%configArray.length;
 			//System.out.println(indexer);
 			ConfigFileEntry entry = new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
