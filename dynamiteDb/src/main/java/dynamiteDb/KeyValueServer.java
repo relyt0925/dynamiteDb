@@ -186,6 +186,9 @@ public class KeyValueServer {
 			ConfigFileEntry entry = new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
 			replicaTracker[i]=entry;
 		}
+		for(int i=0;i<replicaTracker.length;i++){
+			System.out.println(configArray[i].ipAddress+"  "+ configArray[i].hexEncodedKeyValue);
+		}
 		return replicaTracker;			
 	}
 	/**
