@@ -162,6 +162,7 @@ public class KeyValueServer {
 			//match on ips
 			if(myIp.toString().compareTo(configArray[i].ipAddress)==0){
 				foundIndex=i;
+				System.out.println("FOUND INDEX: "+Integer.toString(foundIndex));
 				break;
 			}
 		}
@@ -170,12 +171,14 @@ public class KeyValueServer {
 		ConfigFileEntry[] replicaTracker= new ConfigFileEntry[ipAddressList.length];
 		//NOTE: THIS ONLY WORKS FOR CASE OF 5 with replication factor of 3
 		//IT WILL JUST PUT THE ENTRIES IN THE 
+		System.out.println("STARTING REPLICA CREATOR");
 		for(int i=0;i<numReplicas;i++){
 			//find my secondary keyset, and tietary keyset
 			int indexer=(foundIndex-(i+1));
 			if(indexer<0){
 				indexer=ipAddressList.length+indexer;
 			}
+			System.out.println("INDEXER: "+Integer.toString(i));
 			replicaTracker[i]= new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
 		}
 		//insert my node into the proper spot
@@ -187,6 +190,7 @@ public class KeyValueServer {
 			ConfigFileEntry entry = new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
 			replicaTracker[i]=entry;
 		}
+		System.out.println("END REPLICA CREATOR");
 		for(int i=0;i<replicaTracker.length;i++){
 			System.out.println(configArray[i].ipAddress+"  "+ configArray[i].hexEncodedKeyValue);
 		}
