@@ -89,6 +89,7 @@ public class AntiEntopyDeamon extends DaemonService {
 		//Get IP to do anti-entropy process with and find key range that will be exchanged
 		//Only nodes primary keys exchanged in anti-entropy process
 		String ipToConnectTo= ClientListener.replicaTracker[indexValue].ipAddress;
+		Sytem.out.println("IP CONNECTING:" + ipToConnectTo);
 		//ipToConnectTo="127.0.0.1";
 		int portNumber=13000;
 		int logicalNodeDistanceAway=indexValue-KeyValueServer.numReplicas;
