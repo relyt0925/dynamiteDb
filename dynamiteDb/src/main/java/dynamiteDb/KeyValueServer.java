@@ -179,13 +179,17 @@ public class KeyValueServer {
 				indexer=ipAddressList.length+indexer;
 			}
 			System.out.println("INDEXER: "+Integer.toString(indexer));
+			System.out.println(configArray[indexer].ipAddress);
 			replicaTracker[i]= new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
 		}
 		//insert my node into the proper spot
+		System.out.println(configArray[numReplicas].ipAddress);
 		replicaTracker[numReplicas]= new ConfigFileEntry(configArray[foundIndex].ipAddress,configArray[foundIndex].hexEncodedKeyValue);
 		//get nodes greater than my replica
+		System.out.println("GREATER INDEXER");
 		for(int i=numReplicas+1;i<((2*numReplicas)+1);i++){
 			int indexer=(foundIndex+i)%configArray.length;
+			System.out.println("INDEXER: "+Integer.toString(indexer));
 			//System.out.println(indexer);
 			ConfigFileEntry entry = new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
 			replicaTracker[i]=entry;
