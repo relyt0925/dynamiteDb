@@ -108,6 +108,8 @@ public class AntiEntopyDeamon extends DaemonService {
 		}
 		String startingKey=ClientListener.replicaTracker[startKeyIndex].hexEncodedKeyValue;
 		String endingKey= ClientListener.replicaTracker[endKeyIndex].hexEncodedKeyValue;
+		System.out.println("STARTKEY: "+startingKey);
+		System.out.println("ENDKEY: "+endingKey);
 		//retrieve total keyset 
 		ClientListener.keyLockMapLock.readLock().lock();
 		Set<String> keys=ClientListener.keyLockMap.keySet();
