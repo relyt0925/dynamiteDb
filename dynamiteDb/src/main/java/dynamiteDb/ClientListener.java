@@ -273,6 +273,7 @@ public class ClientListener extends Thread {
 		System.out.println("IN GETTTTT");
 		String key = jsonObj.getString("KEY");
 		System.out.println(key);
+		System.out.println(key.replaceAll(" ", ""));
 		//lock read lock
 		keyLockMapLock.readLock().lock();
 		System.out.println(keyLockMap.keySet().toString());
