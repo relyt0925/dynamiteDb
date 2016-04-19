@@ -98,12 +98,13 @@ public class AntiEntopyDeamon extends DaemonService {
 			//start key is based on index difference away from replica
 			//ie( if only one index away start key should be the index above current node)
 			//if two away startKeyIndex should just be current node
-			startKeyIndex=KeyValueServer.numReplicas-(KeyValueServer.numReplicas-logicalNodeDistanceAway);
-			endKeyIndex=KeyValueServer.numReplicas+1;
+			//startKeyIndex=KeyValueServer.numReplicas-(KeyValueServer.numReplicas-logicalNodeDistanceAway)-1;
+			startKeyIndex=KeyValueServer.numReplicas-(KeyValueServer.numReplicas+1-logicalNodeDistanceAway);
+			endKeyIndex=KeyValueServer.numReplicas;
 		}
 		else{
-			startKeyIndex=0;
-			endKeyIndex=KeyValueServer.numReplicas+logicalNodeDistanceAway+1;
+			startKeyIndex=ClientListener.replicaTracker.length-1;
+			endKeyIndex=KeyValueServer.numReplicas-logicalNodeDistanceAway;
 		}
 		String startingKey=ClientListener.replicaTracker[startKeyIndex].hexEncodedKeyValue;
 		String endingKey= ClientListener.replicaTracker[endKeyIndex].hexEncodedKeyValue;
@@ -123,7 +124,7 @@ public class AntiEntopyDeamon extends DaemonService {
 			boolean isInRange=false;
 			//if starting key is less than the ending key
 			if(startingKey.compareTo(endingKey)<0){
-				if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0)
+				if(i.compareTo(startingKey)>0 && i.compareTo(endingKey)<=0)
 					isInRange=true;
 			}
 			else if(startingKey.compareTo(endingKey)==0){
@@ -132,7 +133,7 @@ public class AntiEntopyDeamon extends DaemonService {
 			}
 			else{
 				//if the startingKey is greater than the ending key, check both ranges
-				if(i.compareTo(endingKey)<0 || i.compareTo(startingKey)>=0)
+				if(i.compareTo(endingKey)<=0 || i.compareTo(startingKey)>0)
 					isInRange=true;
 			}
 			//System.out.println("IS IN RANGE");
