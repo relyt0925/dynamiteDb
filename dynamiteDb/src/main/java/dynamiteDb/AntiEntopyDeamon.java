@@ -75,7 +75,7 @@ public class AntiEntopyDeamon extends DaemonService {
 	@Override
 	void start() {
 		// TODO Auto-generated method stub
-		//System.out.println("Anti-Entropy Process");	
+		System.out.println("Anti-Entropy Process");	
 		lock.lock();
 		int indexValue=replicaItr;
 		//replica tracker is read only!
@@ -89,7 +89,7 @@ public class AntiEntopyDeamon extends DaemonService {
 		//Get IP to do anti-entropy process with and find key range that will be exchanged
 		//Only nodes primary keys exchanged in anti-entropy process
 		String ipToConnectTo= ClientListener.replicaTracker[indexValue].ipAddress;
-		//System.out.println("IP CONNECTING:" + ipToConnectTo);
+		System.out.println("IP CONNECTING:" + ipToConnectTo);
 		//ipToConnectTo="127.0.0.1";
 		int portNumber=13000;
 		int logicalNodeDistanceAway=indexValue-KeyValueServer.numReplicas;
@@ -134,13 +134,13 @@ public class AntiEntopyDeamon extends DaemonService {
 				if(i.compareTo(endingKey)<0 || i.compareTo(startingKey)>=0)
 					isInRange=true;
 			}
-			//System.out.println("IS IN RANGE");
-			//System.out.println(isInRange);
+			System.out.println("IS IN RANGE");
+			System.out.println(isInRange);
 			//this is to test process with every key!!! it wor
 			//if(i.compareTo(startingKey)>=0 && i.compareTo(endingKey)<0 || true)
 			if(isInRange){
 				try {
-					//System.out.println(fullPath);
+					System.out.println(fullPath);
 					//read in key value store object from persistent storage
 					ClientListener.keyLockMap.get(i).readLock().lock();
 					releasedReadLock=false;
