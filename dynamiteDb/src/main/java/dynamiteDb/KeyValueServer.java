@@ -63,17 +63,6 @@ public class KeyValueServer {
 	    logger.addHandler(fh);
 	    SimpleFormatter formatter = new SimpleFormatter();  
 	    fh.setFormatter(formatter); 
-		/*
-		if(hey){
-			ConfigFileEntry[] replicaTrack=generateReplicaTracker();
-			for(int i=0;i<replicaTrack.length;i++){
-				System.out.println(replicaTrack[i].hexEncodedKeyValue+" "+replicaTrack[i].ipAddress);
-				InetAddress a= InetAddress.getByName(replicaTrack[i].ipAddress);
-				System.out.println(a.toString());
-			}
-			return;
-		}
-		*/
 		//initalize replica information
 		ConfigFileEntry[] replicaTrack=generateReplicaTracker();
 		ClientListener.setReplicaTracker(replicaTrack);
@@ -84,7 +73,6 @@ public class KeyValueServer {
 		daemonHandler.addDaemonService(new AntiEntopyDeamon(30));
 		daemonHandler.addDaemonService(new StatsDaemon(10));
 		timer.scheduleAtFixedRate(new DaemonServicesHandler(), 1000, 1000);
-
 	        try {
 	            while (true) {
 	                new ClientListener(listener.accept()).start();
@@ -155,7 +143,6 @@ public class KeyValueServer {
 		}
 		Arrays.sort(configArray);
 		String myIp=getPublicIp();
-		//String myIp = "52.201.0.131";
 		int foundIndex=0;
 		//find where IP is in the sorted array
 		for(int i=0;i<configArray.length;i++){
@@ -194,10 +181,12 @@ public class KeyValueServer {
 			ConfigFileEntry entry = new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
 			replicaTracker[i]=entry;
 		}
+		/*
 		System.out.println("END REPLICA CREATOR");
 		for(int i=0;i<replicaTracker.length;i++){
 			System.out.println(replicaTracker[i].ipAddress+"  "+ replicaTracker[i].hexEncodedKeyValue);
 		}
+		*/
 		return replicaTracker;			
 	}
 	/**
