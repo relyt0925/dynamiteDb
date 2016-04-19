@@ -89,7 +89,7 @@ public class AntiEntopyDeamon extends DaemonService {
 		//Get IP to do anti-entropy process with and find key range that will be exchanged
 		//Only nodes primary keys exchanged in anti-entropy process
 		String ipToConnectTo= ClientListener.replicaTracker[indexValue].ipAddress;
-		//System.out.println("IP CONNECTING:" + ipToConnectTo);
+		System.out.println("IP CONNECTING:" + ipToConnectTo);
 		int portNumber=13000;
 		int logicalNodeDistanceAway=indexValue-KeyValueServer.numReplicas;
 		int startKeyIndex;
@@ -104,12 +104,12 @@ public class AntiEntopyDeamon extends DaemonService {
 		}
 		else{
 			startKeyIndex=ClientListener.replicaTracker.length-1;
-			endKeyIndex=KeyValueServer.numReplicas-logicalNodeDistanceAway;
+			endKeyIndex=KeyValueServer.numReplicas+logicalNodeDistanceAway;
 		}
 		String startingKey=ClientListener.replicaTracker[startKeyIndex].hexEncodedKeyValue;
 		String endingKey= ClientListener.replicaTracker[endKeyIndex].hexEncodedKeyValue;
-		//System.out.println("STARTKEY: "+startingKey);
-		//System.out.println("ENDKEY: "+endingKey);
+		System.out.println("STARTKEY: "+startingKey);
+		System.out.println("ENDKEY: "+endingKey);
 		//retrieve total keyset 
 		ClientListener.keyLockMapLock.readLock().lock();
 		Set<String> keys=ClientListener.keyLockMap.keySet();
