@@ -36,6 +36,7 @@ public class KeyValueServer {
 	public final static String METHOD_PUT = "PUT";
 	public final static String METHOD_ANTI_ENTROPY = "ANTI_ENTROPY";
 	public final static String LOG = "Log";
+	public final static int numReplicas=2;
 	/**
 	 * ipAddressList- List of IPs of all database nodes
 	 */
@@ -62,17 +63,6 @@ public class KeyValueServer {
 	    logger.addHandler(fh);
 	    SimpleFormatter formatter = new SimpleFormatter();  
 	    fh.setFormatter(formatter); 
-		/*
-		if(hey){
-			ConfigFileEntry[] replicaTrack=generateReplicaTracker();
-			for(int i=0;i<replicaTrack.length;i++){
-				System.out.println(replicaTrack[i].hexEncodedKeyValue+" "+replicaTrack[i].ipAddress);
-				InetAddress a= InetAddress.getByName(replicaTrack[i].ipAddress);
-				System.out.println(a.toString());
-			}
-			return;
-		}
-		*/
 		//initalize replica information
 		ConfigFileEntry[] replicaTrack=generateReplicaTracker();
 		ClientListener.setReplicaTracker(replicaTrack);
@@ -83,7 +73,6 @@ public class KeyValueServer {
 		daemonHandler.addDaemonService(new AntiEntopyDeamon(30));
 		daemonHandler.addDaemonService(new StatsDaemon(10));
 		timer.scheduleAtFixedRate(new DaemonServicesHandler(), 1000, 1000);
-
 	        try {
 	            while (true) {
 	                new ClientListener(listener.accept()).start();
@@ -103,7 +92,7 @@ public class KeyValueServer {
 		File[] listOfFiles = folder.listFiles();
 		HashMap<String,ReadWriteLock> initKeyToLockMap = new HashMap<String,ReadWriteLock>();
 		for(File i : listOfFiles){
-			System.out.println(i.getName().substring(0, i.getName().lastIndexOf('.')));
+			//System.out.println(i.getName().substring(0, i.getName().lastIndexOf('.')));
 			String hexKey=i.getName().substring(0, i.getName().lastIndexOf('.'));
 			if(hexKey.isEmpty()){
 				continue;				
@@ -121,6 +110,7 @@ public class KeyValueServer {
 		try{
 			byte[] encoded = Files.readAllBytes(Paths.get("src/main/resources/ip/hostIp.conf"));
 			String ip= new String(encoded,StandardCharsets.US_ASCII);
+			//System.out.println("IP FROM FILE IS:" +ip);
 			return ip;
 		}
 		catch(IOException e){
@@ -152,26 +142,51 @@ public class KeyValueServer {
 			}
 		}
 		Arrays.sort(configArray);
-		//String myIp=getPublicIp();
-		String myIp = "52.201.0.131";
+		String myIp=getPublicIp();
 		int foundIndex=0;
 		//find where IP is in the sorted array
 		for(int i=0;i<configArray.length;i++){
 			//match on ips
 			if(myIp.toString().compareTo(configArray[i].ipAddress)==0){
 				foundIndex=i;
+				//System.out.println("FOUND INDEX: "+Integer.toString(foundIndex));
 				break;
 			}
 		}
 		//set to 3 because 2 replicas
 		//and now find replicas (the next entries does mod to return back to start if need be)
-		ConfigFileEntry[] replicaTracker= new ConfigFileEntry[3];
-		for(int i=0;i<3;i++){
-			int indexer=(foundIndex+i)%configArray.length;
+		ConfigFileEntry[] replicaTracker= new ConfigFileEntry[ipAddressList.length];
+		//NOTE: THIS ONLY WORKS FOR CASE OF 5 with replication factor of 3
+		//IT WILL JUST PUT THE ENTRIES IN THE 
+		//System.out.println("STARTING REPLICA CREATOR");
+		for(int i=0;i<numReplicas;i++){
+			//find my secondary keyset, and tietary keyset
+			int indexer=(foundIndex-(i+1));
+			if(indexer<0){
+				indexer=ipAddressList.length+indexer;
+			}
+			//System.out.println("INDEXER: "+Integer.toString(indexer));
+			//System.out.println(configArray[indexer].ipAddress);
+			replicaTracker[numReplicas-1-i]= new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
+		}
+		//insert my node into the proper spot
+		//System.out.println(configArray[numReplicas].ipAddress);
+		replicaTracker[numReplicas]= new ConfigFileEntry(configArray[foundIndex].ipAddress,configArray[foundIndex].hexEncodedKeyValue);
+		//get nodes greater than my replica
+		//System.out.println("GREATER INDEXER");
+		for(int i=numReplicas+1;i<((2*numReplicas)+1);i++){
+			int indexer=(foundIndex+(i-numReplicas))%configArray.length;
+			//System.out.println("INDEXER: "+Integer.toString(indexer));
 			//System.out.println(indexer);
 			ConfigFileEntry entry = new ConfigFileEntry(configArray[indexer].ipAddress,configArray[indexer].hexEncodedKeyValue);
 			replicaTracker[i]=entry;
 		}
+		/*
+		System.out.println("END REPLICA CREATOR");
+		for(int i=0;i<replicaTracker.length;i++){
+			System.out.println(replicaTracker[i].ipAddress+"  "+ replicaTracker[i].hexEncodedKeyValue);
+		}
+		*/
 		return replicaTracker;			
 	}
 	/**

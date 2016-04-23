@@ -9,8 +9,8 @@ import random
 cmd = 0 #toggle to use cmd or static key/value
 
 method = 'PUT'
-# key='dummy_key'
-key = str(random.randint(0,100))
+key='dummy_key'
+#key = str(random.randint(0,100))
 print key
 value = 'Yaksh'
 timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -31,7 +31,8 @@ if cmd == 1:
 	method = args.method
 
 s = socket.socket()         # Create a socket object
-host = '24.72.242.230' # Get local machine name
+host= 'masterLoadBalancer-759916868.us-east-1.elb.amazonaws.com'
+#host = '54.85.66.252' # Get local machine name
 port = 12415                # Reserve a port for your service.
 
 

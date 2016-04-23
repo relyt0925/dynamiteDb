@@ -12,14 +12,15 @@ import select
 from collections import Counter 
 from itertools import chain
 from threading import Thread, Lock
-
+import netifaces as ni
 mutex = Lock()
 testip = ''
 hashtestip = hashlib.sha256(testip).hexdigest()
 dbnodes_ip_hash=[]
 dbnodes_ip=[]
-
-masterid = 'Master1/'
+ni.ifaddresses('eth0')
+ip=ni.ifaddresses('eth0')[2][0]['addr']
+masterid = str(ip)
 
 HOST = testip    # Symbolic name meaning all available interfaces
 PORT = 12415 # Arbitrary non-privileged port

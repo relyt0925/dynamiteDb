@@ -272,8 +272,12 @@ public class ClientListener extends Thread {
 	private void handleGETRequest(JSONObject jsonObj) throws JSONException {
 		System.out.println("IN GETTTTT");
 		String key = jsonObj.getString("KEY");
+		System.out.println(key);
+		key=key.replaceAll(" ", "");
+		//System.out.println(key.replaceAll(" ", ""));
 		//lock read lock
 		keyLockMapLock.readLock().lock();
+		System.out.println(keyLockMap.keySet().toString());
 		//if it doesnt contain key
 		if(!keyLockMap.containsKey(key)){
 			//if it doesnt have the key, no value stored
