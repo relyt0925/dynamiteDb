@@ -355,7 +355,8 @@ def get_from_dbnode3(data,ip):
 
 def get_from_dbnodes(data,flag):
     """ Function to read the data corresponding to a key from the respective dbnodes
-    Input: data (dictionary of key,value,method,timestamp,vectorclock), flag (0 if direct read, 1 if read and then write)
+    Input: data (dictionary of key,value,method,timestamp,vectorclock), 
+           flag (0 if direct read, 1 if called from post_to_dbnodes)
     """
  
     print 'in get'
