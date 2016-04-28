@@ -13,6 +13,7 @@ from collections import Counter
 from itertools import chain
 from threading import Thread, Lock
 import netifaces as ni
+
 mutex = Lock()
 testip = ''
 hashtestip = hashlib.sha256(testip).hexdigest()
@@ -22,7 +23,7 @@ ni.ifaddresses('eth0')
 ip=ni.ifaddresses('eth0')[2][0]['addr']
 masterid = str(ip)
 
-HOST = testip    # Symbolic name meaning all available interfaces
+HOST = testip    
 PORT = 12415 # Arbitrary non-privileged port
 
 class KeyValueInfo:
@@ -33,6 +34,10 @@ class KeyValueInfo:
 
 
 def lookup_ip(key_hash):
+    """ Implements the consistent hashing protocol to
+    lookup the corresponding ip addresses wrt the hashed
+    key as input.
+    """
 
     print'looking up ip'
 
@@ -43,14 +48,8 @@ def lookup_ip(key_hash):
 
         if(key_hash > prev and key_hash <= ip_hash):
             ip_array[0] = dbnodes_ip[i]
-            # print i
-            # print ip_array[0]
             ip_array[1] = dbnodes_ip[(i+1) % 5]
-            # print ip_array[1]
-            # print i+2
-            # print (i+2) % 5
             ip_array[2] = dbnodes_ip[(i+2) % 5]
-            # print ip_array[2]
             print 'found in loop'
             return ip_array
 
@@ -67,6 +66,9 @@ def lookup_ip(key_hash):
 
 
 def load_ip_hash():
+    """ Loads the list of dbnode ip's from a configuration
+    file into an array for subsequent lookups wrt hashed keys
+    """
 
     global dbnodes_ip,dbnodes_ip_hash
     
@@ -79,8 +81,10 @@ def load_ip_hash():
     print dbnodes_ip
 
 
-#Function for handling connections. This will be used to create threads
 def clientthread(conn):
+    """ Each client request is handled by a separate
+    thread and this is the starting point of each thread.
+    """
     #Sending message to connected client
     conn.send('Welcome to the master server. \n') #send only takes string
      
@@ -90,16 +94,10 @@ def clientthread(conn):
         #Receiving from client
         try:
             rep="Server Down,Please Try again in a few seconds"
-            data = json.loads(conn.recv(1024))
-
-            # hashkey = hashlib.sha256(data['KEY']).hexdigest()   #key hashing. uncomment this and the next line.
-            # data['KEY'] = hashkey
-            
+            data = json.loads(conn.recv(1024))            
             
             client_key=data['KEY']
             key_hash=hashlib.sha256(client_key).hexdigest()
-            # ip='192.168.56.1'
-            # print hashlib.sha256(ip).hexdigest()
             data['KEY'] = key_hash
 
             if(data['METHOD']== 'GET'): 
@@ -130,61 +128,25 @@ def clientthread(conn):
             break
      
      
-    #came out of loop
+
     conn.close()
-
-def get_from_dbnode3(data,ip):
-    s3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)         # Create a socket object
-    # bind_port= 12334
-    print 'trying to get from 3 node = ' +str(ip)
-    try:
-        s3.bind(('', 0))
-        print s3.getsockname()
-    except socket.error as msg:
-        print 'Error Code : ' + str(msg)
-        sys.exit()
-    host1 = ip      # Get local machine name
-    port1 = 13000                # Reserve a port for your service.
-    
-    s3.settimeout(1)
-
-    try:
-        s3.connect((host1, port1))
-
-        j_dump=json.dumps(data)
-        s3.send(b''+j_dump+'\n')
-    except socket.error as msg:
-        print 'Error Code : ' + str(msg)
-        return '404'
-    #set timeout on receive to avoid deadlock
-    #if reply='404' then key not found, otherwise reply='OK'
-    print 'blocking get node 3=' + str(ip)
-
-    
-
-    try:
-        # print 'here\n'
-        reply3=json.loads(s3.recv(1024))
-        print reply3
-    except socket.error as err:
-        reply3='404'
-        print (err)    
-
-    s3.close()
-    return reply3
-
 
 
 def post_to_dbnode3(data,ip):
+    """Called In case one of the two post request to the first
+    two dbnodes fail ,to maintain N=3
+    Input: data (dictionary of key,value,method,timestamp,vectorclock), ip (of the third dbnode in N=3)
+    """   
+
     s3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)         # Create a socket object
-    # bind_port= 12334
+
     try:
         s3.bind(('', 0))
         print s3.getsockname()
     except socket.error as msg:
         print 'Error Code : ' + str(msg)
         sys.exit()
-    host1 = ip      # Get local machine name
+    host1 = ip                   # Get ip of dbnode
     port1 = 13000                # Reserve a port for your service.
     
     s3.settimeout(1)
@@ -214,9 +176,11 @@ def post_to_dbnode3(data,ip):
     return reply3
  
 def post_to_dbnodes(data):
-    # acquire mutex incase of multiple connections to same
-    # db servers. Otherwise,If one connection completes, the port will 
-    # be closed and will result in unpredictable behavior for the other connection.
+    """Function to insert timestamp & vector clock into the 
+    clients request and update the key-value pair at the 
+    respective dbnodes. First read then write.
+    Input: data (dictionary of key,value,method,timestamp,vectorclock)
+    """
 
     print 'in post acquire'
 
@@ -255,9 +219,9 @@ def post_to_dbnodes(data):
     # bind_port= 12333
     # bind_port1=12335
     
-    host1 = ip_array[0].split("\n")[0]      # Get local machine name
+    host1 = ip_array[0].split("\n")[0]      # Get dbnode ip
     port1 = 13000
-    host2 = ip_array[1].split("\n")[0]      # Get local machine name
+    host2 = ip_array[1].split("\n")[0]      # Get dbnode ip
     port2 = 13000
 
     j_dump=json.dumps(data)
@@ -284,8 +248,7 @@ def post_to_dbnodes(data):
     except socket.error as msg:
         print 'Error Code : ' + str(msg) + str(host1)
         recent_reply="Server Down,Please Try again in a few seconds."
-        # s1.close()
-        # s2.close()
+
         server_fail=server_fail+1
 
         reply1='404'
@@ -305,8 +268,7 @@ def post_to_dbnodes(data):
     except socket.error as msg:
         print 'Error Code : ' + str(msg) + str(host2)
         recent_reply="Server Down,Please Try again in a few seconds."
-        # s1.close()
-        # s2.close()
+
         server_fail=server_fail+1
 
         reply2='404'
@@ -335,20 +297,67 @@ def post_to_dbnodes(data):
             mutex.release()
             return 'POST SUCCESS'
         else:
-	        s1.close()
-	        s2.close()
-	        mutex.release()
-	        return 'Error: 2 of 3 Servers Down, Please try again in a few seconds'
+            s1.close()
+            s2.close()
+            mutex.release()
+            return 'Error: 2 of 3 Servers Down, Please try again in a few seconds'
     else:
         mutex.release()
         return 'Error: 2 of 3 Servers Down, Please try again in a few seconds (Server 1 and Server 2)'
 
 
-# def ip_lookup(hash_key):
+def get_from_dbnode3(data,ip):
+    """Called In case one of the two get requests from the first
+    two dbnodes fail, to maintain N=3
+    Input: data (dictionary of key,value,method,timestamp,vectorclock), ip (of the third dbnode in N=3)
+    """
+
+    s3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)         # Create a socket object
+
+    print 'trying to get from 3 node = ' +str(ip)
+    try:
+        s3.bind(('', 0))
+        print s3.getsockname()
+    except socket.error as msg:
+        print 'Error Code : ' + str(msg)
+        sys.exit()
+    host1 = ip                   # Get ip of dbnode
+    port1 = 13000                # Reserve a port for your service.
+    
+    s3.settimeout(1)
+
+    try:
+        s3.connect((host1, port1))
+
+        j_dump=json.dumps(data)
+        s3.send(b''+j_dump+'\n')
+    except socket.error as msg:
+        print 'Error Code : ' + str(msg)
+        return '404'
+    #set timeout on receive to avoid deadlock
+    #if reply='404' then key not found, otherwise reply='OK'
+    print 'blocking get node 3=' + str(ip)
+
+    
+
+    try:
+        # print 'here\n'
+        reply3=json.loads(s3.recv(1024))
+        print reply3
+    except socket.error as err:
+        reply3='404'
+        print (err)    
+
+    s3.close()
+    return reply3
+
+
+
 def get_from_dbnodes(data,flag):
-    # acquire mutex incase of multiple connections to same
-    # db servers. Otherwise,If one connection completes, the port will 
-    # be closed and will result in unpredictable behavior for the other connection.
+    """ Function to read the data corresponding to a key from the respective dbnodes
+    Input: data (dictionary of key,value,method,timestamp,vectorclock), 
+           flag (0 if direct read, 1 if called from post_to_dbnodes)
+    """
  
     print 'in get'
 
@@ -361,8 +370,7 @@ def get_from_dbnodes(data,flag):
     s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)          # Create a socket object
     s1.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)    
-    # bind_port= 12336
-    # bind_port1=12337
+
     s1.settimeout(1)
     s2.settimeout(1)
 
@@ -379,11 +387,11 @@ def get_from_dbnodes(data,flag):
 
     ip_array=lookup_ip(data['KEY'])
 
-    host1 = ip_array[0].split("\n")[0]       # Get local machine name
+    host1 = ip_array[0].split("\n")[0]       # Get ip of dbnode
     port1 = 13000                # Reserve a port for your service.
     
 
-    host2 = ip_array[1].split("\n")[0]       # Get local machine name
+    host2 = ip_array[1].split("\n")[0]       # Get ip of dbnode
     port2 = 13000                # Reserve a port for your service.
 
     print 'trying to connect to ' + host1 + ':' + str(port1) +' and ' + host2 + ':' + str(port2)
@@ -399,8 +407,7 @@ def get_from_dbnodes(data,flag):
     except socket.error as msg:
         print 'Error Code : ' + str(msg) + str(host1)
         recent_reply="Server Down,Please Try again in a few seconds."
-        # s1.close()
-        # s2.close()
+
         server_fail=server_fail+1
         reply1='404'
         if(server_fail==2):
@@ -419,8 +426,7 @@ def get_from_dbnodes(data,flag):
     except socket.error as msg:
         print 'Error Code : ' + str(msg) + str(host2)
         recent_reply="Server Down,Please Try again in a few seconds."
-        # s1.close()
-        # s2.close()
+
         server_fail=server_fail+1
         reply2='404'
         if(server_fail==2):
@@ -485,9 +491,11 @@ def get_from_dbnodes(data,flag):
 
 
 def conflict_check(rep1, rep2):
-    #Returns 0 if conflict
-    #Returns 1 if reply1 is more recent
-    #Returns 2 if reply2 is more recent
+    """Function to checl Vector clock conflict 
+    Returns 0 if conflict
+    Returns 1 if reply1 is more recent
+    Returns 2 if reply2 is more recent
+    """
     print rep1
     print rep2
 
@@ -529,14 +537,11 @@ load_ip_hash()
 while 1:
     #wait to accept a connection - blocking call
     conn, addr = s.accept()
-    # me=socket.gethostbyname(socket.gethostname())
-    # server_ip_digest=hashlib.sha256(me).digest()
-    # dbnodes_ip_hash[me]=server_ip_digest
-    # print dbnodes_ip_hash
+
     print socket.gethostbyname(socket.gethostname())
     print 'Connected with ' + addr[0] + ':' + str(addr[1])
      
-    #start new thread takes 1st argument as a function name to be run, second is the tuple of arguments to the function.
+    #start new thread, takes 1st argument as a function name to be run, second is the tuple of arguments to the function.
     start_new_thread(clientthread ,(conn,))
  
 s.close()  
