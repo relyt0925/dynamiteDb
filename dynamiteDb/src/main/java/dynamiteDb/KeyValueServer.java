@@ -27,15 +27,16 @@ import java.util.Timer;
 /**
  * This class instantiates the Key Value Server. Server initialization is peformed in 
  * this class
- * @author Satyajeet
+ * @author Tyler Lisowski
  *
  */
 public class KeyValueServer {
-	
+	//ENUMERATIONS that specify each type of request
 	public final static String METHOD_GET = "GET";
 	public final static String METHOD_PUT = "PUT";
 	public final static String METHOD_ANTI_ENTROPY = "ANTI_ENTROPY";
 	public final static String LOG = "Log";
+	//set number of replicas in the system (N=numReplicas+1)
 	public final static int numReplicas=2;
 	/**
 	 * ipAddressList- List of IPs of all database nodes
@@ -58,6 +59,7 @@ public class KeyValueServer {
 		generateConfigFile();
 		HashMap<String,ReadWriteLock> initKeyToLockMap= getListOfKeyFiles();
 		ClientListener.setInitKeyLockHashmap(initKeyToLockMap);
+		//setup Logger to log system info
 		Logger logger = Logger.getLogger(LOG);
 		FileHandler fh = new FileHandler("Logs/"+new Date().getTime()+".log");  
 	    logger.addHandler(fh);
@@ -73,6 +75,7 @@ public class KeyValueServer {
 		daemonHandler.addDaemonService(new AntiEntopyDeamon(30));
 		daemonHandler.addDaemonService(new StatsDaemon(10));
 		timer.scheduleAtFixedRate(new DaemonServicesHandler(), 1000, 1000);
+		//main loop- process client requests
 	        try {
 	            while (true) {
 	                new ClientListener(listener.accept()).start();
@@ -94,6 +97,7 @@ public class KeyValueServer {
 		for(File i : listOfFiles){
 			//System.out.println(i.getName().substring(0, i.getName().lastIndexOf('.')));
 			String hexKey=i.getName().substring(0, i.getName().lastIndexOf('.'));
+			//handles hidden file issues (they start with .)
 			if(hexKey.isEmpty()){
 				continue;				
 			}
@@ -153,12 +157,10 @@ public class KeyValueServer {
 				break;
 			}
 		}
-		//set to 3 because 2 replicas
 		//and now find replicas (the next entries does mod to return back to start if need be)
 		ConfigFileEntry[] replicaTracker= new ConfigFileEntry[ipAddressList.length];
 		//NOTE: THIS ONLY WORKS FOR CASE OF 5 with replication factor of 3
 		//IT WILL JUST PUT THE ENTRIES IN THE 
-		//System.out.println("STARTING REPLICA CREATOR");
 		for(int i=0;i<numReplicas;i++){
 			//find my secondary keyset, and tietary keyset
 			int indexer=(foundIndex-(i+1));
